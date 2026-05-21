@@ -1,0 +1,43 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+@layer base {
+  body {
+    @apply bg-canvas text-ink antialiased font-sans;
+    font-weight: 320;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans tracking-tight;
+  }
+}
+
+@layer components {
+  .button-primary {
+    @apply bg-primary text-inverse-ink px-5 py-[10px] rounded-pill font-sans text-[20px] font-480 transition-transform active:scale-95;
+  }
+
+  .button-secondary {
+    @apply bg-canvas text-ink px-[18px] pt-2 pb-[10px] rounded-pill font-sans text-[20px] font-480 transition-transform active:scale-95;
+  }
+
+  .color-block {
+    @apply rounded-lg p-12 w-full;
+  }
+
+  .display-xl {
+    @apply text-[86px] font-340 leading-[1.00] tracking-display-xl;
+  }
+
+  .display-lg {
+    @apply text-[64px] font-340 leading-[1.10] tracking-display-lg;
+  }
+
+  .eyebrow {
+    @apply font-mono uppercase text-[18px] tracking-eyebrow font-400;
+  }
+
+  .caption {
+    @apply font-mono uppercase text-[12px] tracking-caption font-400 leading-none;
+  }
+}

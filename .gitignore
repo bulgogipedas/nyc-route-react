@@ -25,6 +25,7 @@ dist-ssr
 
 # Agent instruction and planning files
 *.md
+!README.md
 AGENTS.md
 CLAUDE.md
 GEMINI.md

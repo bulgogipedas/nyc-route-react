@@ -22,11 +22,11 @@ export async function initDuckDB() {
 
     conn = await db.connect()
     
-    // Register the parquet file in the DB virtual filesystem
-    console.log('DuckDB initialized. Registering trips Parquet file...')
+    // Register the browser-ready TLC trip path extract in the DB virtual filesystem
+    console.log('DuckDB initialized. Registering TLC trip paths Parquet file...')
     await db.registerFileURL(
-      'trips_sample.parquet',
-      `${window.location.origin}/data/trips_sample.parquet`,
+      'trip_paths.parquet',
+      `${window.location.origin}/data/trip_paths.parquet`,
       duckdb.DuckDBDataProtocol.HTTP,
       false
     )

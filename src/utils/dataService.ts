@@ -94,7 +94,7 @@ export async function loadTripsForHour(hour: number, month?: string) {
     // Query 1: Get trips for the current active hour (for maps)
     const tripsQuery = `
       SELECT vendor, trip_distance, fare, path 
-      FROM 'trips_sample.parquet' 
+      FROM 'trip_paths.parquet' 
       WHERE month = '${activeMonth}' AND hour = ${hour}
     `
     const tripsResult = await conn.query(tripsQuery)

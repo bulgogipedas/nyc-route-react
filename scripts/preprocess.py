@@ -15,7 +15,8 @@ TRIP_FILES = [
     os.path.join(DATA_DIR, 'yellow_tripdata_2026-02.parquet'),
     os.path.join(DATA_DIR, 'yellow_tripdata_2026-03.parquet'),
 ]
-SAMPLE_PER_MONTH = 30000
+TLC_TRIP_RECORD_DATA_URL = 'https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page'
+INTERACTIVE_RECORDS_PER_MONTH = 30000
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -49,7 +50,7 @@ def preprocess():
     manhattan_zones = lookup[lookup['Borough'] == 'Manhattan']['LocationID'].tolist()
     centroids = get_centroids()
 
-    sample_exports = []
+    interactive_exports = []
     months = []
     monthly_stats = {}
     hourly_volume_by_month = {}
@@ -102,16 +103,18 @@ def preprocess():
         months.append({
             'id': month_id,
             'label': month_label,
+            'source': 'NYC Taxi & Limousine Commission Yellow Taxi Trip Records',
+            'source_url': TLC_TRIP_RECORD_DATA_URL,
             'source_file': os.path.basename(path),
             **stats,
         })
 
-        print(f"Generating {month_label} trip sample...")
-        sample_df = df.sample(min(SAMPLE_PER_MONTH, len(df)), random_state=int(month_num)).copy()
-        sample_df['path'] = sample_df.apply(get_coords_json, axis=1)
-        sample_df = sample_df.dropna(subset=['path'])
+        print(f"Generating {month_label} browser-ready trip path extract...")
+        interactive_df = df.sample(min(INTERACTIVE_RECORDS_PER_MONTH, len(df)), random_state=int(month_num)).copy()
+        interactive_df['path'] = interactive_df.apply(get_coords_json, axis=1)
+        interactive_df = interactive_df.dropna(subset=['path'])
 
-        export_df = sample_df[[
+        export_df = interactive_df[[
             'VendorID',
             'hour',
             'trip_distance',
@@ -120,22 +123,22 @@ def preprocess():
         ]].copy()
         export_df.columns = ['vendor', 'hour', 'trip_distance', 'fare', 'path']
         export_df.insert(0, 'month', month_id)
-        sample_exports.append(export_df)
+        interactive_exports.append(export_df)
 
-    all_samples = pd.concat(sample_exports, ignore_index=True)
-    all_samples.to_parquet(os.path.join(OUTPUT_DIR, 'trips_sample.parquet'), index=False)
-    print(f"Exported {len(all_samples)} sampled trips across {len(months)} months.")
+    interactive_records = pd.concat(interactive_exports, ignore_index=True)
+    interactive_records.to_parquet(os.path.join(OUTPUT_DIR, 'trip_paths.parquet'), index=False)
+    print(f"Exported {len(interactive_records)} browser-ready trip paths across {len(months)} months.")
 
     latest_month = months[-1]['id']
-    latest_sample = all_samples[all_samples['month'] == latest_month]
+    latest_interactive_records = interactive_records[interactive_records['month'] == latest_month]
 
     # Legacy/static startup files use the latest available month. Interactive views
-    # recalculate hotspots and flows by month/hour from trips_sample.parquet.
+    # recalculate hotspots and flows by month/hour from trip_paths.parquet.
     print(f"Generating latest-month startup layers for {latest_month}...")
     pu_counts = {}
     do_counts = {}
     od_counts = {}
-    for row in latest_sample.itertuples(index=False):
+    for row in latest_interactive_records.itertuples(index=False):
         segments = json.loads(row.path)
         if not segments or len(segments) < 2:
             continue

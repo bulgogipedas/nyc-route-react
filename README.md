@@ -2,7 +2,7 @@
 
 ChronoRoute is an interactive visual analytics dashboard for NYC Yellow Taxi movement in Manhattan. It helps users inspect hourly taxi activity, identify areas that need more taxis, spot areas where taxis are accumulating, and understand major passenger movement corridors.
 
-The app runs fully in the browser. Trip samples are queried locally with DuckDB-WASM, while the map experience is rendered with Deck.gl and MapLibre. The included dataset covers January, February, and March 2026, with March 2026 selected by default as the latest available month.
+The app uses official NYC Taxi & Limousine Commission Yellow Taxi Trip Record Data for January, February, and March 2026, with March 2026 selected by default as the latest available month. It runs fully in the browser: compact TLC-derived trip path extracts are queried locally with DuckDB-WASM, while full-month aggregates are precomputed for the analytics panels.
 
 ## Features
 
@@ -88,19 +88,31 @@ src/
     dataService.ts        Data loading and hourly aggregation
     duckdb.ts             DuckDB-WASM setup
 public/
-  data/                   Preprocessed monthly sample and aggregate datasets
+  data/                   TLC-derived monthly path extracts and aggregate datasets
 scripts/
   preprocess.py           Data preprocessing helper
 ```
 
-## Data Notes
+## Data Source
 
-The raw source files are NYC Yellow Taxi parquet files for January, February, and March 2026. They are batch-processed into compact browser-ready artifacts:
+The source data comes from the official [NYC TLC Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page) page. TLC publishes trip record datasets monthly in Parquet format. The files used here are:
 
-- `trips_sample.parquet`: sampled trip paths for interactive map animation and hover analysis.
+- `yellow_tripdata_2026-01.parquet`
+- `yellow_tripdata_2026-02.parquet`
+- `yellow_tripdata_2026-03.parquet`
+
+Only Yellow Taxi trips with both pickup and dropoff locations in Manhattan are retained for this dashboard.
+
+TLC notes that yellow and green taxi trip records include pickup/dropoff dates and times, pickup/dropoff locations, trip distances, fares, rate types, payment types, and passenger counts. TLC also notes that the trip data is collected from authorized technology providers and is not created by TLC.
+
+## Data Pipeline
+
+The raw TLC Parquet files are batch-processed into browser-ready artifacts:
+
+- `trip_paths.parquet`: TLC-derived trip path extract for interactive map animation and hover analysis.
 - `months.json`: available month metadata.
 - `hourly_volume_by_month.json`: full-month hourly aggregates for the analytics chart and KPI calculations.
 - `stats.json`: latest-month startup stats.
 - `h3_deadhead.json` and `od_flows.json`: latest-month startup map layers before interactive filtering runs.
 
-The map uses a sample so the browser stays responsive. The KPI and hourly volume analytics use precomputed aggregates from the full filtered monthly datasets.
+The animated map uses the compact path extract so the browser stays responsive. KPI cards and hourly volume analytics use precomputed aggregates from the full filtered monthly TLC datasets.

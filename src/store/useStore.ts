@@ -31,6 +31,8 @@ export interface ODFlowDatum {
 export interface MonthDatum {
   id: string
   label: string
+  source: string
+  source_url: string
   total_trips: number
   avg_distance: number
   peak_hour: number

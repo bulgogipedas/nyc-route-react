@@ -244,7 +244,7 @@ export default function SidebarControls() {
             </div>
           </div>
           <div className="text-[12px] text-primary/60 mt-2 leading-relaxed">
-            {formatCompact(currentHourVolume)} sampled trips this hour. {getPressureTone(deficitZones, surplusZones)}
+            {formatCompact(currentHourVolume)} TLC trip records this hour. {getPressureTone(deficitZones, surplusZones)}
           </div>
         </div>
 
@@ -346,7 +346,7 @@ export default function SidebarControls() {
                     return (
                       <div className="bg-primary/95 text-canvas p-2 rounded-sm border border-hairline/25 text-[11px] font-mono">
                         <div className="font-540">Hour starting {formatHour(data.hour)}</div>
-                        <div>{data.count.toLocaleString()} sampled trips</div>
+                        <div>{data.count.toLocaleString()} TLC trip records</div>
                       </div>
                     )
                   }

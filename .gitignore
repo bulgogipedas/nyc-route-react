@@ -24,8 +24,6 @@ dist-ssr
 *.sw?
 
 # Agent instruction and planning files
-*.md
-!README.md
 AGENTS.md
 CLAUDE.md
 GEMINI.md
@@ -36,10 +34,33 @@ GEMINI.md
 task.md
 implementation_plan.md
 walkthrough.md
+design.md
 
 # Python Virtual Environments
 venv/
 .venv/
+__pycache__/
+*.pyc
+.env
+airflow/.env
 
-# Raw input data for preprocessing
-/data/
+# Data lake artifacts
+data/bronze/**
+!data/bronze/README.md
+data/silver/**
+!data/silver/README.md
+data/gold/**
+!data/gold/README.md
+data/reference/*
+!data/reference/README.md
+data/*.parquet
+data/taxi_zone_lookup.csv
+data/taxi_zones.json
+
+# Airflow runtime artifacts
+airflow/logs/**
+
+# Local scratch and stale generated browser artifacts
+scratch/
+public/data/h3_data.json
+public/data/trips_sample.json

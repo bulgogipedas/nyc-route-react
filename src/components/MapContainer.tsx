@@ -4,6 +4,7 @@ import Map from 'react-map-gl/maplibre'
 import { TripsLayer } from '@deck.gl/geo-layers'
 import { H3HexagonLayer } from '@deck.gl/geo-layers'
 import { ArcLayer } from '@deck.gl/layers'
+import { cellToLatLng } from 'h3-js'
 import { useStore } from '../store/useStore'
 import {
   ZoomIn,
@@ -17,6 +18,29 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+
+const formatCompact = (value: number) => new Intl.NumberFormat('en-US').format(Math.round(value))
+
+const formatHour = (hour: number) => `${String(hour).padStart(2, '0')}:00`
+
+const describeManhattanArea = (position: [number, number]) => {
+  const [lng, lat] = position
+  const northSouth =
+    lat >= 40.82 ? 'Upper Manhattan' :
+    lat >= 40.785 ? 'Upper Manhattan edge' :
+    lat >= 40.745 ? 'Midtown Manhattan' :
+    lat >= 40.715 ? 'Lower Manhattan' :
+    'Downtown edge'
+  const eastWest = lng <= -73.99 ? 'west side' : lng >= -73.955 ? 'east side' : 'central corridor'
+  return `${northSouth}, ${eastWest}`
+}
+
+const getHotspotPriority = (value: number, maxValue: number) => {
+  const ratio = maxValue > 0 ? Math.abs(value) / maxValue : 0
+  if (ratio >= 0.66) return { label: 'High priority', tone: 'text-block-pink', bar: 'w-full' }
+  if (ratio >= 0.33) return { label: 'Medium priority', tone: 'text-block-lime', bar: 'w-2/3' }
+  return { label: 'Low priority', tone: 'text-canvas/70', bar: 'w-1/3' }
+}
 
 interface HoverInfo {
   x: number
@@ -67,6 +91,114 @@ export default function MapContainer() {
   // Calculate dynamic maximums for scaling visuals based on the current hour's active data
   const maxVal = h3Data.reduce((max, d) => Math.max(max, Math.abs(d.deadhead_metric)), 1)
   const maxFlow = odFlows.reduce((max, d) => Math.max(max, d.count), 1)
+
+  const renderTooltip = () => {
+    if (!hoverInfo) return null
+
+    if (hoverInfo.layerId === 'h3') {
+      const metric = Number(hoverInfo.object.deadhead_metric || 0)
+      const pickups = Number(hoverInfo.object.pickups || 0)
+      const dropoffs = Number(hoverInfo.object.dropoffs || 0)
+      const gap = Math.abs(metric)
+      const center = cellToLatLng(hoverInfo.object.h3)
+      const areaLabel = describeManhattanArea([center[1], center[0]])
+      const isDeficit = metric < 0
+      const isBalanced = metric === 0
+      const priority = getHotspotPriority(metric, maxVal)
+      const title = isBalanced
+        ? 'Balanced taxi activity'
+        : isDeficit
+          ? 'Area needs more taxis'
+          : 'Excess taxis accumulating'
+      const action = isBalanced
+        ? 'Keep monitoring. Pickup and dropoff activity are currently matched.'
+        : isDeficit
+          ? 'Dispatch available taxis toward this area before wait times rise.'
+          : 'Route idle taxis out toward nearby demand zones.'
+
+      return (
+        <div className="space-y-3">
+          <div>
+            <div className={`text-[12px] font-mono tracking-eyebrow ${isDeficit ? 'text-block-pink' : 'text-block-lime'}`}>
+              {isDeficit ? 'DEMAND GAP' : isBalanced ? 'BALANCED AREA' : 'SUPPLY BUILDUP'}
+            </div>
+            <div className="text-[18px] font-540 leading-tight mt-1">{title}</div>
+            <div className="text-[12px] text-canvas/55 mt-1">{areaLabel} • {formatHour(timeHour)}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-canvas/8 border border-hairline/15 rounded-sm p-2">
+              <div className="text-[10px] text-canvas/45">Pickups</div>
+              <div className="text-[18px] font-540 text-block-pink">{formatCompact(pickups)}</div>
+            </div>
+            <div className="bg-canvas/8 border border-hairline/15 rounded-sm p-2">
+              <div className="text-[10px] text-canvas/45">Dropoffs</div>
+              <div className="text-[18px] font-540 text-block-lime">{formatCompact(dropoffs)}</div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[12px]">
+              <span className="text-canvas/55">{isDeficit ? 'Taxi shortfall' : isBalanced ? 'Net gap' : 'Taxi surplus'}</span>
+              <span className={priority.tone}>{isBalanced ? '0' : formatCompact(gap)} trips</span>
+            </div>
+            <div className="h-1.5 bg-canvas/15 rounded-full overflow-hidden">
+              <div className={`h-full ${isDeficit ? 'bg-block-pink' : 'bg-block-lime'} ${priority.bar}`} />
+            </div>
+            <div className={`text-[11px] font-540 ${priority.tone}`}>{priority.label}</div>
+          </div>
+
+          <div className="bg-canvas text-primary rounded-sm p-3 text-[12px] leading-relaxed">
+            <span className="font-540">Suggested action:</span> {action}
+          </div>
+        </div>
+      )
+    }
+
+    if (hoverInfo.layerId === 'arc') {
+      const count = Number(hoverInfo.object.count || 0)
+      const ratio = Math.min(1, count / maxFlow)
+      const fromLabel = describeManhattanArea(hoverInfo.object.from)
+      const toLabel = describeManhattanArea(hoverInfo.object.to)
+
+      return (
+        <div className="space-y-3">
+          <div>
+            <div className="text-[12px] font-mono tracking-eyebrow text-block-mint">PASSENGER CORRIDOR</div>
+            <div className="text-[18px] font-540 leading-tight mt-1">Strong origin-to-destination flow</div>
+            <div className="text-[12px] text-canvas/55 mt-1">{formatHour(timeHour)} passenger movement</div>
+          </div>
+
+          <div className="space-y-2 text-[12px]">
+            <div>
+              <div className="text-canvas/45">Pickup area</div>
+              <div className="font-540">{fromLabel}</div>
+            </div>
+            <div>
+              <div className="text-canvas/45">Dropoff area</div>
+              <div className="font-540">{toLabel}</div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-[12px]">
+              <span className="text-canvas/55">Observed trips</span>
+              <span className="text-block-lime">{formatCompact(count)}</span>
+            </div>
+            <div className="h-1.5 bg-canvas/15 rounded-full overflow-hidden">
+              <div className="h-full bg-block-mint" style={{ width: `${Math.max(12, ratio * 100)}%` }} />
+            </div>
+          </div>
+
+          <div className="bg-canvas text-primary rounded-sm p-3 text-[12px] leading-relaxed">
+            Use this corridor to understand where riders are pulling vehicles next.
+          </div>
+        </div>
+      )
+    }
+
+    return null
+  }
 
   // DeckGL Layers definition
   const layers = [
@@ -187,48 +319,10 @@ export default function MapContainer() {
       {/* Tooltip Overlay */}
       {hoverInfo && (
         <div
-          className="absolute z-50 p-4 bg-primary/95 text-canvas rounded-sm border border-hairline/25 shadow-lg backdrop-blur-md pointer-events-none transition-all duration-75"
+          className="absolute z-50 w-[320px] p-4 bg-primary/95 text-canvas rounded-md border border-hairline/25 shadow-2xl backdrop-blur-md pointer-events-none transition-all duration-75"
           style={{ left: hoverInfo.x + 15, top: hoverInfo.y + 15 }}
         >
-          {hoverInfo.layerId === 'h3' && (
-            <div className="space-y-2">
-              <div className="text-[12px] font-mono text-block-pink font-400">H3 HEXAGON CELL</div>
-              <div className="text-[14px] font-mono font-bold text-canvas">{hoverInfo.object.h3}</div>
-              <div className="h-px bg-hairline/20 my-1"></div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm font-sans">
-                <span className="text-canvas/60">Pickups:</span>
-                <span className="text-right font-bold text-block-mint">{hoverInfo.object.pickups}</span>
-                <span className="text-canvas/60">Dropoffs:</span>
-                <span className="text-right font-bold text-block-lilac">{hoverInfo.object.dropoffs}</span>
-              </div>
-              <div className="h-px bg-hairline/20 my-1"></div>
-              <div className="text-sm font-sans flex items-center justify-between gap-4">
-                <span className="text-canvas/60">Deadhead Metric:</span>
-                <span className={`font-bold ${hoverInfo.object.deadhead_metric >= 0 ? 'text-block-lime' : 'text-block-pink'}`}>
-                  {hoverInfo.object.deadhead_metric > 0 ? `+${hoverInfo.object.deadhead_metric}` : hoverInfo.object.deadhead_metric}
-                </span>
-              </div>
-              <div className="text-[10px] font-sans text-canvas/50 italic max-w-[200px] mt-1">
-                {hoverInfo.object.deadhead_metric > 0 
-                  ? 'Surplus supply. Taxis must deadhead out of this zone.'
-                  : 'Surplus demand. Taxis need to deadhead into this zone.'}
-              </div>
-            </div>
-          )}
-
-          {hoverInfo.layerId === 'arc' && (
-            <div className="space-y-2">
-              <div className="text-[12px] font-mono text-block-pink font-400">ORIGIN-DESTINATION FLOW</div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm font-sans">
-                <span className="text-canvas/60">Flow Count:</span>
-                <span className="text-right font-bold text-block-lime">{hoverInfo.object.count} trips</span>
-              </div>
-              <div className="h-px bg-hairline/20 my-1"></div>
-              <div className="text-[10px] font-sans text-canvas/50 italic max-w-[200px]">
-                Showing high-density flow between Manhattan centroids.
-              </div>
-            </div>
-          )}
+          {renderTooltip()}
         </div>
       )}
 

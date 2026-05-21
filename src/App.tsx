@@ -9,7 +9,7 @@ import { initDuckDB } from './utils/duckdb'
 import { ShieldAlert } from 'lucide-react'
 
 export default function App() {
-  const { timeHour, isLoading, error, setError, setLoading, trips } = useStore()
+  const { selectedMonth, timeHour, isLoading, error, setError, setLoading, trips } = useStore()
 
   // Initial load
   useEffect(() => {
@@ -22,35 +22,35 @@ export default function App() {
         console.log('Initializing DuckDB-WASM...')
         await initDuckDB()
 
+        const initialState = useStore.getState()
         console.log('Loading hourly volume distribution...')
-        await loadHourlyVolume()
+        await loadHourlyVolume(initialState.selectedMonth)
 
-        console.log(`Loading initial trips for hour ${timeHour}...`)
-        await loadTripsForHour(timeHour)
-      } catch (err: any) {
+        console.log(`Loading initial trips for ${initialState.selectedMonth} hour ${initialState.timeHour}...`)
+        await loadTripsForHour(initialState.timeHour, initialState.selectedMonth)
+      } catch (err: unknown) {
         console.error('Initialization error:', err)
-        setError(err.message || 'Failed to initialize ChronoRoute analytical sandbox.')
+        setError(err instanceof Error ? err.message : 'Failed to initialize ChronoRoute analytical sandbox.')
       } finally {
         setLoading(false)
       }
     }
     init()
-  }, [])
+  }, [setError, setLoading])
 
-  // Sync trips on hour change
+  // Sync trips when the selected month or hour changes
   useEffect(() => {
-    // Only load trips if DuckDB is ready
     let active = true
     async function sync() {
-      // Just check if the file is queried, loadTripsForHour is self-initializing
       if (!active) return
-      await loadTripsForHour(timeHour)
+      await loadHourlyVolume(selectedMonth)
+      await loadTripsForHour(timeHour, selectedMonth)
     }
     sync()
     return () => {
       active = false
     }
-  }, [timeHour])
+  }, [selectedMonth, timeHour])
 
   return (
     <div className="flex w-screen h-screen bg-block-navy text-canvas font-sans select-none overflow-hidden">

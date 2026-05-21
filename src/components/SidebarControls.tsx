@@ -7,7 +7,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { useStore } from '../store/useStore'
-import { Layers, Cuboid as Cube, HelpCircle, Activity, MapPinned } from 'lucide-react'
+import { Layers, Cuboid as Cube, HelpCircle, Activity, MapPinned, CalendarDays } from 'lucide-react'
 
 const formatCompact = (value: number) => new Intl.NumberFormat('en-US').format(Math.round(value))
 
@@ -26,9 +26,19 @@ const getPressureTone = (deficitZones: number, surplusZones: number) => {
   return 'Supply and demand are relatively balanced across active zones.'
 }
 
+interface ChartClickState {
+  activePayload?: {
+    payload: {
+      hour: number
+    }
+  }[]
+}
+
 export default function SidebarControls() {
   const {
     timeHour,
+    selectedMonth,
+    availableMonths,
     showTrips,
     showH3,
     showArc,
@@ -38,6 +48,7 @@ export default function SidebarControls() {
     hourlyVolume,
     h3Data,
     odFlows,
+    setSelectedMonth,
     setTimeHour,
     isLoading,
   } = useStore()
@@ -48,7 +59,7 @@ export default function SidebarControls() {
   }
 
   // Handle chart click to select hour
-  const handleChartClick = (state: any) => {
+  const handleChartClick = (state: ChartClickState | null) => {
     if (state && state.activePayload && state.activePayload.length > 0) {
       const activeHour = state.activePayload[0].payload.hour
       setTimeHour(activeHour)
@@ -71,6 +82,34 @@ export default function SidebarControls() {
         <p className="text-[13px] text-canvas/75 font-sans leading-relaxed mt-2">
           Visual analytics dashboard for NYC Yellow Taxi fleet distribution and transit flows in Manhattan.
         </p>
+      </div>
+
+      <div className="h-px bg-hairline/15" />
+
+      {/* Month Selector */}
+      <div className="space-y-3">
+        <div className="flex items-center space-x-2 text-[12px] font-mono text-canvas/60">
+          <CalendarDays size={14} className="text-block-lime" />
+          <span>DATA MONTH</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {availableMonths.map((month) => (
+            <button
+              key={month.id}
+              onClick={() => setSelectedMonth(month.id)}
+              className={`min-h-11 rounded-md border px-2 py-2 text-left transition-all ${
+                selectedMonth === month.id
+                  ? 'bg-block-lime text-primary border-block-lime'
+                  : 'bg-canvas/5 text-canvas border-hairline/15 hover:border-hairline/40'
+              }`}
+            >
+              <div className="text-[11px] font-mono">{month.id.slice(5)}</div>
+              <div className={`text-[10px] mt-0.5 ${selectedMonth === month.id ? 'text-primary/65' : 'text-canvas/45'}`}>
+                {month.label.split(' ')[0]}
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="h-px bg-hairline/15" />
@@ -286,7 +325,7 @@ export default function SidebarControls() {
               height={155}
               data={hourlyVolume}
               margin={{ top: 18, right: 8, left: -24, bottom: 0 }}
-              onClick={handleChartClick}
+              onClick={(state) => handleChartClick(state as ChartClickState)}
             >
               <XAxis
                 dataKey="hour"

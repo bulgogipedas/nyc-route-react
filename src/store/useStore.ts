@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-interface MapState {
+export interface MapState {
   latitude: number
   longitude: number
   zoom: number
@@ -8,28 +8,70 @@ interface MapState {
   bearing: number
 }
 
+export type TripSegment = [number, number, number]
+
+export interface TripDatum {
+  vendor: number
+  segments: TripSegment[]
+}
+
+export interface H3Datum {
+  h3: string
+  pickups: number
+  dropoffs: number
+  deadhead_metric: number
+}
+
+export interface ODFlowDatum {
+  from: [number, number]
+  to: [number, number]
+  count: number
+}
+
+export interface MonthDatum {
+  id: string
+  label: string
+  total_trips: number
+  avg_distance: number
+  peak_hour: number
+  total_revenue: number
+  source_file: string
+}
+
+export interface HourlyVolumeDatum {
+  hour: number
+  count: number
+  total_distance: number
+  total_revenue: number
+}
+
+export interface StatsDatum {
+  total_trips: number
+  avg_distance: number
+  peak_hour: number
+  total_revenue: number
+}
+
 interface UIState {
+  selectedMonth: string
   timeHour: number
   showTrips: boolean
   showH3: boolean
   showArc: boolean
   use3D: boolean
-  selectedH3: any | null
-  selectedTrip: any | null
-  selectedArc: any | null
+  selectedH3: H3Datum | null
+  selectedTrip: TripDatum | null
+  selectedArc: ODFlowDatum | null
 }
 
 interface DataState {
-  stats: {
-    total_trips: number
-    avg_distance: number
-    peak_hour: number
-    total_revenue: number
-  } | null
-  trips: any[]
-  h3Data: any[]
-  odFlows: any[]
-  hourlyVolume: { hour: number; count: number }[]
+  availableMonths: MonthDatum[]
+  stats: StatsDatum | null
+  trips: TripDatum[]
+  h3Data: H3Datum[]
+  odFlows: ODFlowDatum[]
+  hourlyVolume: HourlyVolumeDatum[]
+  hourlyVolumeByMonth: Record<string, HourlyVolumeDatum[]>
   isLoading: boolean
   error: string | null
 }
@@ -37,17 +79,20 @@ interface DataState {
 type StoreState = UIState & DataState & {
   mapState: MapState
   setMapState: (mapState: Partial<MapState>) => void
+  setSelectedMonth: (month: string) => void
   setTimeHour: (hour: number) => void
   toggleLayer: (layer: 'trips' | 'h3' | 'arc') => void
   toggle3D: () => void
-  setSelectedH3: (h3: any | null) => void
-  setSelectedTrip: (trip: any | null) => void
-  setSelectedArc: (arc: any | null) => void
-  setStats: (stats: any) => void
-  setTrips: (trips: any[]) => void
-  setH3Data: (h3Data: any[]) => void
-  setOdFlows: (odFlows: any[]) => void
-  setHourlyVolume: (hourlyVolume: { hour: number; count: number }[]) => void
+  setSelectedH3: (h3: H3Datum | null) => void
+  setSelectedTrip: (trip: TripDatum | null) => void
+  setSelectedArc: (arc: ODFlowDatum | null) => void
+  setAvailableMonths: (months: DataState['availableMonths']) => void
+  setStats: (stats: StatsDatum) => void
+  setTrips: (trips: TripDatum[]) => void
+  setH3Data: (h3Data: H3Datum[]) => void
+  setOdFlows: (odFlows: ODFlowDatum[]) => void
+  setHourlyVolume: (hourlyVolume: HourlyVolumeDatum[]) => void
+  setHourlyVolumeByMonth: (hourlyVolumeByMonth: DataState['hourlyVolumeByMonth']) => void
   setLoading: (isLoading: boolean) => void
   setError: (error: string | null) => void
 }
@@ -61,6 +106,7 @@ export const useStore = create<StoreState>((set) => ({
     pitch: 45,
     bearing: 0,
   },
+  selectedMonth: '2026-03',
   timeHour: 12, // Noon by default
   showTrips: true,
   showH3: true,
@@ -70,15 +116,18 @@ export const useStore = create<StoreState>((set) => ({
   selectedTrip: null,
   selectedArc: null,
 
+  availableMonths: [],
   stats: null,
   trips: [],
   h3Data: [],
   odFlows: [],
   hourlyVolume: [],
+  hourlyVolumeByMonth: {},
   isLoading: false,
   error: null,
 
   setMapState: (state) => set((s) => ({ mapState: { ...s.mapState, ...state } })),
+  setSelectedMonth: (selectedMonth) => set({ selectedMonth }),
   setTimeHour: (hour) => set({ timeHour: hour }),
   toggleLayer: (layer) => set((s) => {
     switch (layer) {
@@ -91,11 +140,13 @@ export const useStore = create<StoreState>((set) => ({
   setSelectedH3: (selectedH3) => set({ selectedH3 }),
   setSelectedTrip: (selectedTrip) => set({ selectedTrip }),
   setSelectedArc: (selectedArc) => set({ selectedArc }),
+  setAvailableMonths: (availableMonths) => set({ availableMonths }),
   setStats: (stats) => set({ stats }),
   setTrips: (trips) => set({ trips }),
   setH3Data: (h3Data) => set({ h3Data }),
   setOdFlows: (odFlows) => set({ odFlows }),
   setHourlyVolume: (hourlyVolume) => set({ hourlyVolume }),
+  setHourlyVolumeByMonth: (hourlyVolumeByMonth) => set({ hourlyVolumeByMonth }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
 }))

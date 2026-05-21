@@ -2,11 +2,12 @@
 
 ChronoRoute is an interactive visual analytics dashboard for NYC Yellow Taxi movement in Manhattan. It helps users inspect hourly taxi activity, identify areas that need more taxis, spot areas where taxis are accumulating, and understand major passenger movement corridors.
 
-The app runs fully in the browser. Trip samples are queried locally with DuckDB-WASM, while the map experience is rendered with Deck.gl and MapLibre.
+The app runs fully in the browser. Trip samples are queried locally with DuckDB-WASM, while the map experience is rendered with Deck.gl and MapLibre. The included dataset covers January, February, and March 2026, with March 2026 selected by default as the latest available month.
 
 ## Features
 
 - Interactive Manhattan taxi map with animated trip paths.
+- Month selector for January, February, and March 2026 data.
 - Hotspot layer showing where taxis are needed or where excess taxis are building up.
 - Plain-language hover tooltips with pickup count, dropoff count, priority, and suggested dispatch action.
 - Optional 3D hotspot height to make stronger imbalances easier to see.
@@ -87,11 +88,19 @@ src/
     dataService.ts        Data loading and hourly aggregation
     duckdb.ts             DuckDB-WASM setup
 public/
-  data/                   Preprocessed sample datasets
+  data/                   Preprocessed monthly sample and aggregate datasets
 scripts/
   preprocess.py           Data preprocessing helper
 ```
 
 ## Data Notes
 
-The included data is a compact sample prepared for browser-based exploration. Values shown in the dashboard are intended for product demonstration and visual analysis, not official transportation reporting.
+The raw source files are NYC Yellow Taxi parquet files for January, February, and March 2026. They are batch-processed into compact browser-ready artifacts:
+
+- `trips_sample.parquet`: sampled trip paths for interactive map animation and hover analysis.
+- `months.json`: available month metadata.
+- `hourly_volume_by_month.json`: full-month hourly aggregates for the analytics chart and KPI calculations.
+- `stats.json`: latest-month startup stats.
+- `h3_deadhead.json` and `od_flows.json`: latest-month startup map layers before interactive filtering runs.
+
+The map uses a sample so the browser stays responsive. The KPI and hourly volume analytics use precomputed aggregates from the full filtered monthly datasets.

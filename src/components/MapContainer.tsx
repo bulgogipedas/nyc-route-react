@@ -4,8 +4,9 @@ import Map from 'react-map-gl/maplibre'
 import { TripsLayer } from '@deck.gl/geo-layers'
 import { H3HexagonLayer } from '@deck.gl/geo-layers'
 import { ArcLayer } from '@deck.gl/layers'
+import type { Layer, PickingInfo } from '@deck.gl/core'
 import { cellToLatLng } from 'h3-js'
-import { useStore } from '../store/useStore'
+import { useStore, type H3Datum, type MapState, type ODFlowDatum, type TripDatum, type TripSegment } from '../store/useStore'
 import {
   ZoomIn,
   ZoomOut,
@@ -42,12 +43,19 @@ const getHotspotPriority = (value: number, maxValue: number) => {
   return { label: 'Low priority', tone: 'text-canvas/70', bar: 'w-1/3' }
 }
 
-interface HoverInfo {
+type HoverInfo =
+  | {
   x: number
   y: number
-  object: any
-  layerId: string
-}
+      object: H3Datum
+      layerId: 'h3'
+    }
+  | {
+      x: number
+      y: number
+      object: ODFlowDatum
+      layerId: 'arc'
+    }
 
 export default function MapContainer() {
   const {
@@ -68,7 +76,8 @@ export default function MapContainer() {
 
   // Reset time to start of hour when the hour changes
   useEffect(() => {
-    setCurrentTime(timeHour * 3600)
+    const frame = requestAnimationFrame(() => setCurrentTime(timeHour * 3600))
+    return () => cancelAnimationFrame(frame)
   }, [timeHour])
 
   // Animation loop for TripsLayer
@@ -202,7 +211,7 @@ export default function MapContainer() {
 
   // DeckGL Layers definition
   const layers = [
-    showH3 && h3Data.length > 0 && new H3HexagonLayer({
+    showH3 && h3Data.length > 0 && new H3HexagonLayer<H3Datum>({
       id: 'h3-layer',
       data: h3Data,
       pickable: true,
@@ -210,9 +219,9 @@ export default function MapContainer() {
       filled: true,
       extruded: use3D,
       elevationScale: 1,
-      getHexagon: (d: any) => d.h3,
+      getHexagon: (d) => d.h3,
       // Normalize colors dynamically based on current hour's maximum metric
-      getFillColor: (d: any) => {
+      getFillColor: (d) => {
         const val = d.deadhead_metric
         const ratio = Math.abs(val) / maxVal
         // Apply power scaling so low values remain visible but high values stand out
@@ -230,11 +239,11 @@ export default function MapContainer() {
       getLineColor: [255, 255, 255, 25],
       lineWidthMinPixels: 0.8,
       // Power-scale elevation to create a beautiful 3D skyline (capped at 1.5km)
-      getElevation: (d: any) => {
+      getElevation: (d) => {
         const val = Math.abs(d.deadhead_metric)
         return Math.pow(val / maxVal, 0.7) * 1200
       },
-      onHover: (info: any) => {
+      onHover: (info: PickingInfo<H3Datum>) => {
         if (info.object) {
           setHoverInfo({
             x: info.x,
@@ -253,20 +262,19 @@ export default function MapContainer() {
       }
     }),
 
-    showArc && odFlows.length > 0 && new ArcLayer({
+    showArc && odFlows.length > 0 && new ArcLayer<ODFlowDatum>({
       id: 'arc-layer',
       data: odFlows,
       pickable: true,
       // Scale arc width dynamically between 1 and 6 pixels
-      getWidth: (d: any) => 1 + (d.count / maxFlow) * 5,
-      getSourcePosition: (d: any) => d.from,
-      getTargetPosition: (d: any) => d.to,
+      getWidth: (d) => 1 + (d.count / maxFlow) * 5,
+      getSourcePosition: (d) => d.from,
+      getTargetPosition: (d) => d.to,
       // Source color (pickup) is magenta, target (dropoff) is lime yellow
-      getSourceColor: (d: any) => [255, 51, 204, Math.floor(80 + 175 * (d.count / maxFlow))],
-      getTargetColor: (d: any) => [210, 255, 0, Math.floor(80 + 175 * (d.count / maxFlow))],
+      getSourceColor: (d) => [255, 51, 204, Math.floor(80 + 175 * (d.count / maxFlow))],
+      getTargetColor: (d) => [210, 255, 0, Math.floor(80 + 175 * (d.count / maxFlow))],
       getHeight: 0.5,
-      tilt: 15,
-      onHover: (info: any) => {
+      onHover: (info: PickingInfo<ODFlowDatum>) => {
         if (info.object) {
           setHoverInfo({
             x: info.x,
@@ -285,27 +293,26 @@ export default function MapContainer() {
       }
     }),
 
-    showTrips && trips.length > 0 && new TripsLayer({
+    showTrips && trips.length > 0 && new TripsLayer<TripDatum>({
       id: 'trips-layer',
       data: trips,
       // Map path to [lng, lat] to prevent Deck.gl from treating the 3rd index (timestamp) as a Z-altitude coordinate
-      getPath: (d: any) => d.segments.map((p: any) => [p[0], p[1]]),
-      getTimestamps: (d: any) => d.segments.map((p: any) => p[2]),
+      getPath: (d) => d.segments.map((p: TripSegment) => [p[0], p[1]]) as unknown as number[],
+      getTimestamps: (d) => d.segments.map((p: TripSegment) => p[2]),
       // CMT Vendor 1 = Electric Pink, Verifone Vendor 2 = Neon Mint
-      getColor: (d: any) => d.vendor === 1 ? [255, 51, 204] : [0, 245, 212],
+      getColor: (d) => d.vendor === 1 ? [255, 51, 204] : [0, 245, 212],
       opacity: 0.95,
       widthMinPixels: 2.5,
       trailLength: 180,
       currentTime: currentTime,
-      shadowEnabled: false,
     })
-  ].filter(Boolean) as any[]
+  ].filter(Boolean) as Layer[]
 
   return (
     <div className="relative w-full h-full bg-block-navy overflow-hidden">
       <DeckGL
         viewState={mapState}
-        onViewStateChange={(e: any) => setMapState(e.viewState)}
+        onViewStateChange={(e) => setMapState(e.viewState as Partial<MapState>)}
         controller={true}
         layers={layers}
         getCursor={({ isHovering }) => (isHovering ? 'pointer' : 'default')}

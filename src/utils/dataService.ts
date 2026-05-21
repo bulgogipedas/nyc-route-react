@@ -1,12 +1,21 @@
 import { getDuckDB } from './duckdb'
-import { useStore } from '../store/useStore'
+import { useStore, type H3Datum, type HourlyVolumeDatum, type MonthDatum, type ODFlowDatum, type StatsDatum, type TripDatum, type TripSegment } from '../store/useStore'
 import { latLngToCell, cellToLatLng } from 'h3-js'
+
+interface TripRow {
+  vendor: number
+  path: string
+}
+
+interface ArrowRow<T> {
+  toJSON: () => T
+}
 
 export async function loadStaticData() {
   const store = useStore.getState()
   store.setLoading(true)
   try {
-    const [statsRes, h3Res, odRes] = await Promise.all([
+    const [statsRes, h3Res, odRes, monthsRes, hourlyByMonthRes] = await Promise.all([
       fetch('/data/stats.json').then((res) => {
         if (!res.ok) throw new Error('Failed to fetch stats')
         return res.json()
@@ -19,22 +28,65 @@ export async function loadStaticData() {
         if (!res.ok) throw new Error('Failed to fetch OD flows')
         return res.json()
       }),
+      fetch('/data/months.json').then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch months')
+        return res.json()
+      }),
+      fetch('/data/hourly_volume_by_month.json').then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch hourly volume by month')
+        return res.json()
+      }),
     ])
-    
-    store.setStats(statsRes)
-    store.setH3Data(h3Res)
-    store.setOdFlows(odRes)
+
+    const months = monthsRes as MonthDatum[]
+    const hourlyByMonth = hourlyByMonthRes as Record<string, HourlyVolumeDatum[]>
+    const latestMonth = months[months.length - 1]?.id || store.selectedMonth
+    store.setAvailableMonths(months)
+    store.setSelectedMonth(latestMonth)
+    store.setHourlyVolumeByMonth(hourlyByMonth)
+    store.setHourlyVolume(hourlyByMonth[latestMonth] || [])
+    store.setStats(statsRes as StatsDatum)
+    store.setH3Data(h3Res as H3Datum[])
+    store.setOdFlows(odRes as ODFlowDatum[])
     store.setError(null)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Failed to load static configuration data:', error)
-    store.setError('Failed to load static configuration: ' + error.message)
+    store.setError('Failed to load static configuration: ' + (error instanceof Error ? error.message : String(error)))
   } finally {
     store.setLoading(false)
   }
 }
 
-export async function loadTripsForHour(hour: number) {
+function buildCumulativeStats(month: string, hour: number) {
   const store = useStore.getState()
+  const hourlyVolume = store.hourlyVolumeByMonth[month] || []
+  const activeRows = hourlyVolume.filter((row) => row.hour <= hour)
+
+  if (activeRows.length === 0) {
+    return {
+      total_trips: 0,
+      avg_distance: 0,
+      peak_hour: hour,
+      total_revenue: 0,
+    }
+  }
+
+  const totalTrips = activeRows.reduce((sum, row) => sum + Number(row.count || 0), 0)
+  const totalDistance = activeRows.reduce((sum, row) => sum + Number(row.total_distance || 0), 0)
+  const totalRevenue = activeRows.reduce((sum, row) => sum + Number(row.total_revenue || 0), 0)
+  const peak = activeRows.reduce((max, row) => Number(row.count || 0) > Number(max.count || 0) ? row : max, activeRows[0])
+
+  return {
+    total_trips: totalTrips,
+    avg_distance: totalTrips > 0 ? totalDistance / totalTrips : 0,
+    peak_hour: Number(peak.hour),
+    total_revenue: totalRevenue,
+  }
+}
+
+export async function loadTripsForHour(hour: number, month?: string) {
+  const store = useStore.getState()
+  const activeMonth = month || store.selectedMonth
   store.setLoading(true)
   try {
     const { conn } = await getDuckDB()
@@ -43,28 +95,19 @@ export async function loadTripsForHour(hour: number) {
     const tripsQuery = `
       SELECT vendor, trip_distance, fare, path 
       FROM 'trips_sample.parquet' 
-      WHERE hour = ${hour}
+      WHERE month = '${activeMonth}' AND hour = ${hour}
     `
     const tripsResult = await conn.query(tripsQuery)
-    const tripsRows = tripsResult.toArray()
-    
-    // Query 2: Get cumulative stats from hour 0 to activeHour (for KPIs)
-    const statsQuery = `
-      SELECT COUNT(*) as trip_count, SUM(trip_distance) as total_distance, SUM(fare) as total_fare 
-      FROM 'trips_sample.parquet' 
-      WHERE hour <= ${hour}
-    `
-    const statsResult = await conn.query(statsQuery)
-    const statsRows = statsResult.toArray()
-    
-    const parsedTrips: any[] = []
+    const tripsRows = tripsResult.toArray() as ArrowRow<TripRow>[]
+
+    const parsedTrips: TripDatum[] = []
     const puCounts: Record<string, number> = {}
     const doCounts: Record<string, number> = {}
     const flowCounts: Record<string, number> = {}
     
-    tripsRows.forEach((row: any) => {
+    tripsRows.forEach((row) => {
       const rowObj = row.toJSON()
-      const segments = JSON.parse(rowObj.path)
+      const segments = JSON.parse(rowObj.path) as TripSegment[]
       
       parsedTrips.push({
         vendor: rowObj.vendor,
@@ -92,7 +135,7 @@ export async function loadTripsForHour(hour: number) {
     
     // Generate H3 deadhead metrics (dropoffs - pickups)
     const uniqueH3 = new Set([...Object.keys(puCounts), ...Object.keys(doCounts)])
-    const h3Data = Array.from(uniqueH3).map((h3) => {
+    const h3Data: H3Datum[] = Array.from(uniqueH3).map((h3) => {
       const pickups = puCounts[h3] || 0
       const dropoffs = doCounts[h3] || 0
       return {
@@ -104,88 +147,32 @@ export async function loadTripsForHour(hour: number) {
     })
     
     // Generate OD Flows from flow counts
-    const odFlows = Object.entries(flowCounts).map(([key, count]) => {
+    const odFlows: ODFlowDatum[] = Object.entries(flowCounts).map(([key, count]) => {
       const [fromHex, toHex] = key.split('->')
       const fromLatLng = cellToLatLng(fromHex)
       const toLatLng = cellToLatLng(toHex)
       return {
-        from: [fromLatLng[1], fromLatLng[0]], // [lng, lat]
-        to: [toLatLng[1], toLatLng[0]], // [lng, lat]
+        from: [fromLatLng[1], fromLatLng[0]] as [number, number], // [lng, lat]
+        to: [toLatLng[1], toLatLng[0]] as [number, number], // [lng, lat]
         count
       }
     }).sort((a, b) => b.count - a.count).slice(0, 400) // Keep top 400 flows for visual efficiency
     
-    // Scale cumulative stats (trips_sample is a ~1% sample of the full 2.96M dataset)
-    const scaleFactor = 100
-    let totalTripsScaled = 0
-    let avgDistance = 0
-    let totalRevenueScaled = 0
-    
-    if (statsRows.length > 0) {
-      const statsObj = statsRows[0].toJSON()
-      const rawCount = Number(statsObj.trip_count || 0)
-      const rawDistance = Number(statsObj.total_distance || 0)
-      const rawFare = Number(statsObj.total_fare || 0)
-      
-      totalTripsScaled = rawCount * scaleFactor
-      avgDistance = rawCount > 0 ? rawDistance / rawCount : 0
-      totalRevenueScaled = rawFare * scaleFactor
-    }
-    
-    // Find the peak hour between 0 and activeHour dynamically
-    let peakHour = 18
-    if (store.hourlyVolume && store.hourlyVolume.length > 0) {
-      const activeVolume = store.hourlyVolume.filter(v => v.hour <= hour)
-      if (activeVolume.length > 0) {
-        const peak = activeVolume.reduce((max, curr) => curr.count > max.count ? curr : max, { hour: 0, count: 0 })
-        peakHour = peak.hour
-      }
-    }
-    
-    const hourlyStats = {
-      total_trips: totalTripsScaled,
-      avg_distance: avgDistance,
-      peak_hour: peakHour,
-      total_revenue: totalRevenueScaled
-    }
-    
     store.setTrips(parsedTrips)
     store.setH3Data(h3Data)
     store.setOdFlows(odFlows)
-    store.setStats(hourlyStats)
+    store.setStats(buildCumulativeStats(activeMonth, hour))
     store.setError(null)
-  } catch (error: any) {
-    console.error(`Failed to load trips for hour ${hour}:`, error)
-    store.setError(`Failed to query trips data for hour ${hour}: ` + error.message)
+  } catch (error: unknown) {
+    console.error(`Failed to load trips for ${activeMonth} hour ${hour}:`, error)
+    store.setError(`Failed to query ${activeMonth} trips for hour ${hour}: ` + (error instanceof Error ? error.message : String(error)))
   } finally {
     store.setLoading(false)
   }
 }
 
-export async function loadHourlyVolume() {
+export async function loadHourlyVolume(month?: string) {
   const store = useStore.getState()
-  try {
-    const { conn } = await getDuckDB()
-    const query = `
-      SELECT hour, COUNT(*) as count 
-      FROM 'trips_sample.parquet' 
-      GROUP BY hour 
-      ORDER BY hour
-    `
-    const result = await conn.query(query)
-    const rows = result.toArray()
-    
-    const parsedVolume = rows.map((row: any) => {
-      const rowObj = row.toJSON()
-      return {
-        hour: Number(rowObj.hour),
-        count: Number(rowObj.count),
-      }
-    })
-    
-    store.setHourlyVolume(parsedVolume)
-  } catch (error) {
-    console.error('Failed to load hourly volume from DuckDB:', error)
-  }
+  const activeMonth = month || store.selectedMonth
+  store.setHourlyVolume(store.hourlyVolumeByMonth[activeMonth] || [])
 }
-

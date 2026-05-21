@@ -9,7 +9,7 @@ import { initDuckDB } from './utils/duckdb'
 import { ShieldAlert } from 'lucide-react'
 
 export default function App() {
-  const { selectedMonth, timeHour, isLoading, error, setError, setLoading, trips } = useStore()
+  const { selectedMonth, selectedService, timeHour, isLoading, error, setError, setLoading, trips } = useStore()
 
   // Initial load
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function App() {
     return () => {
       active = false
     }
-  }, [selectedMonth, timeHour])
+  }, [selectedMonth, selectedService, timeHour])
 
   return (
     <div className="flex w-screen h-screen bg-block-navy text-canvas font-sans select-none overflow-hidden">

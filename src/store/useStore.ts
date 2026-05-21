@@ -11,7 +11,8 @@ export interface MapState {
 export type TripSegment = [number, number, number]
 
 export interface TripDatum {
-  vendor: number
+  vendor: number | string
+  service_type?: string
   segments: TripSegment[]
 }
 
@@ -30,6 +31,7 @@ export interface ODFlowDatum {
 
 export interface MonthDatum {
   id: string
+  service_type?: string
   label: string
   source: string
   source_url: string
@@ -74,6 +76,7 @@ export interface PipelineMetadata {
 }
 
 interface UIState {
+  selectedService: string
   selectedMonth: string
   timeHour: number
   showTrips: boolean
@@ -93,6 +96,7 @@ interface DataState {
   odFlows: ODFlowDatum[]
   hourlyVolume: HourlyVolumeDatum[]
   hourlyVolumeByMonth: Record<string, HourlyVolumeDatum[]>
+  hourlyVolumeByServiceMonth: Record<string, Record<string, HourlyVolumeDatum[]>>
   metadata: PipelineMetadata | null
   isLoading: boolean
   error: string | null
@@ -102,6 +106,7 @@ type StoreState = UIState & DataState & {
   mapState: MapState
   setMapState: (mapState: Partial<MapState>) => void
   setSelectedMonth: (month: string) => void
+  setSelectedService: (service: string) => void
   setTimeHour: (hour: number) => void
   toggleLayer: (layer: 'trips' | 'h3' | 'arc') => void
   toggle3D: () => void
@@ -115,6 +120,7 @@ type StoreState = UIState & DataState & {
   setOdFlows: (odFlows: ODFlowDatum[]) => void
   setHourlyVolume: (hourlyVolume: HourlyVolumeDatum[]) => void
   setHourlyVolumeByMonth: (hourlyVolumeByMonth: DataState['hourlyVolumeByMonth']) => void
+  setHourlyVolumeByServiceMonth: (hourlyVolumeByServiceMonth: DataState['hourlyVolumeByServiceMonth']) => void
   setMetadata: (metadata: PipelineMetadata | null) => void
   setLoading: (isLoading: boolean) => void
   setError: (error: string | null) => void
@@ -130,6 +136,7 @@ export const useStore = create<StoreState>((set) => ({
     bearing: 0,
   },
   selectedMonth: '2026-03',
+  selectedService: 'yellow',
   timeHour: 12, // Noon by default
   showTrips: true,
   showH3: true,
@@ -146,12 +153,14 @@ export const useStore = create<StoreState>((set) => ({
   odFlows: [],
   hourlyVolume: [],
   hourlyVolumeByMonth: {},
+  hourlyVolumeByServiceMonth: {},
   metadata: null,
   isLoading: false,
   error: null,
 
   setMapState: (state) => set((s) => ({ mapState: { ...s.mapState, ...state } })),
   setSelectedMonth: (selectedMonth) => set({ selectedMonth }),
+  setSelectedService: (selectedService) => set({ selectedService }),
   setTimeHour: (hour) => set({ timeHour: hour }),
   toggleLayer: (layer) => set((s) => {
     switch (layer) {
@@ -171,6 +180,7 @@ export const useStore = create<StoreState>((set) => ({
   setOdFlows: (odFlows) => set({ odFlows }),
   setHourlyVolume: (hourlyVolume) => set({ hourlyVolume }),
   setHourlyVolumeByMonth: (hourlyVolumeByMonth) => set({ hourlyVolumeByMonth }),
+  setHourlyVolumeByServiceMonth: (hourlyVolumeByServiceMonth) => set({ hourlyVolumeByServiceMonth }),
   setMetadata: (metadata) => set({ metadata }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),

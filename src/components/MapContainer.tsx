@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react'
 import DeckGL from '@deck.gl/react'
 import Map from 'react-map-gl/maplibre'
 import { TripsLayer } from '@deck.gl/geo-layers'
-import { H3HexagonLayer } from '@deck.gl/geo-layers'
-import { ArcLayer } from '@deck.gl/layers'
+import { ArcLayer, PolygonLayer } from '@deck.gl/layers'
 import type { Layer, PickingInfo } from '@deck.gl/core'
-import { cellToLatLng } from 'h3-js'
+import { cellToBoundary, cellToLatLng, isValidCell } from 'h3-js'
 import { useStore, type H3Datum, type MapState, type ODFlowDatum, type TripDatum, type TripSegment } from '../store/useStore'
 import {
   ZoomIn,
@@ -34,6 +33,30 @@ const describeManhattanArea = (position: [number, number]) => {
     'Downtown edge'
   const eastWest = lng <= -73.99 ? 'west side' : lng >= -73.955 ? 'east side' : 'central corridor'
   return `${northSouth}, ${eastWest}`
+}
+
+const isRenderableH3 = (datum: H3Datum) => {
+  if (!datum.h3 || !isValidCell(datum.h3)) return false
+  try {
+    const [lat, lng] = cellToLatLng(datum.h3)
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  } catch {
+    return false
+  }
+}
+
+type H3PolygonDatum = H3Datum & {
+  polygon: [number, number][]
+}
+
+const toH3Polygon = (datum: H3Datum): H3PolygonDatum | null => {
+  if (!isRenderableH3(datum)) return null
+  try {
+    const polygon = cellToBoundary(datum.h3).map(([lat, lng]) => [lng, lat] as [number, number])
+    return { ...datum, polygon }
+  } catch {
+    return null
+  }
 }
 
 const getHotspotPriority = (value: number, maxValue: number) => {
@@ -73,6 +96,7 @@ export default function MapContainer() {
 
   const [currentTime, setCurrentTime] = useState(timeHour * 3600)
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null)
+  const renderableH3Data = h3Data.map(toH3Polygon).filter((datum): datum is H3PolygonDatum => Boolean(datum))
 
   // Reset time to start of hour when the hour changes
   useEffect(() => {
@@ -98,7 +122,7 @@ export default function MapContainer() {
   }, [timeHour])
 
   // Calculate dynamic maximums for scaling visuals based on the current hour's active data
-  const maxVal = h3Data.reduce((max, d) => Math.max(max, Math.abs(d.deadhead_metric)), 1)
+  const maxVal = renderableH3Data.reduce((max, d) => Math.max(max, Math.abs(d.deadhead_metric)), 1)
   const maxFlow = odFlows.reduce((max, d) => Math.max(max, d.count), 1)
 
   const renderTooltip = () => {
@@ -211,15 +235,15 @@ export default function MapContainer() {
 
   // DeckGL Layers definition
   const layers = [
-    showH3 && h3Data.length > 0 && new H3HexagonLayer<H3Datum>({
+    showH3 && renderableH3Data.length > 0 && new PolygonLayer<H3PolygonDatum>({
       id: 'h3-layer',
-      data: h3Data,
+      data: renderableH3Data,
       pickable: true,
       wireframe: true,
       filled: true,
       extruded: use3D,
       elevationScale: 1,
-      getHexagon: (d) => d.h3,
+      getPolygon: (d) => d.polygon,
       // Normalize colors dynamically based on current hour's maximum metric
       getFillColor: (d) => {
         const val = d.deadhead_metric
@@ -243,7 +267,7 @@ export default function MapContainer() {
         const val = Math.abs(d.deadhead_metric)
         return Math.pow(val / maxVal, 0.7) * 1200
       },
-      onHover: (info: PickingInfo<H3Datum>) => {
+      onHover: (info: PickingInfo<H3PolygonDatum>) => {
         if (info.object) {
           setHoverInfo({
             x: info.x,
@@ -257,8 +281,8 @@ export default function MapContainer() {
       },
       updateTriggers: {
         extruded: use3D,
-        getFillColor: [h3Data, maxVal],
-        getElevation: [h3Data, maxVal]
+        getFillColor: [renderableH3Data, maxVal],
+        getElevation: [renderableH3Data, maxVal]
       }
     }),
 

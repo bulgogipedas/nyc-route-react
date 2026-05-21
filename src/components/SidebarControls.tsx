@@ -37,6 +37,7 @@ interface ChartClickState {
 export default function SidebarControls() {
   const {
     timeHour,
+    selectedService,
     selectedMonth,
     availableMonths,
     showTrips,
@@ -49,6 +50,7 @@ export default function SidebarControls() {
     h3Data,
     odFlows,
     setSelectedMonth,
+    setSelectedService,
     setTimeHour,
     isLoading,
     metadata,
@@ -72,6 +74,8 @@ export default function SidebarControls() {
   const deficitZones = h3Data.filter((item) => item.deadhead_metric < 0).length
   const surplusZones = h3Data.filter((item) => item.deadhead_metric > 0).length
   const strongestFlow = odFlows[0]?.count || 0
+  const services = metadata?.available_services?.length ? metadata.available_services : ['yellow']
+  const visibleMonths = availableMonths.filter((month) => !month.service_type || month.service_type === selectedService)
   const generatedAt = metadata?.generated_at ? new Date(metadata.generated_at) : null
   const generatedAtLabel = generatedAt && !Number.isNaN(generatedAt.getTime())
     ? generatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -109,11 +113,31 @@ export default function SidebarControls() {
       {/* Month Selector */}
       <div className="space-y-3">
         <div className="flex items-center space-x-2 text-[12px] font-mono text-canvas/60">
+          <MapPinned size={14} className="text-block-lime" />
+          <span>SERVICE TYPE</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {services.map((service) => (
+            <button
+              key={service}
+              onClick={() => setSelectedService(service)}
+              className={`min-h-10 rounded-md border px-2 py-2 text-left uppercase transition-all ${
+                selectedService === service
+                  ? 'bg-block-lime text-primary border-block-lime'
+                  : 'bg-canvas/5 text-canvas border-hairline/15 hover:border-hairline/40'
+              }`}
+            >
+              <div className="text-[11px] font-mono">{service}</div>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center space-x-2 text-[12px] font-mono text-canvas/60">
           <CalendarDays size={14} className="text-block-lime" />
           <span>DATA MONTH</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {availableMonths.map((month) => (
+          {visibleMonths.map((month) => (
             <button
               key={month.id}
               onClick={() => setSelectedMonth(month.id)}

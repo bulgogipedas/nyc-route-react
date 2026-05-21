@@ -3,7 +3,8 @@ import { useStore, type H3Datum, type HourlyVolumeDatum, type MonthDatum, type O
 import { latLngToCell, cellToLatLng } from 'h3-js'
 
 interface TripRow {
-  vendor: number
+  vendor: number | string
+  service_type?: string
   path: string
 }
 
@@ -15,7 +16,7 @@ export async function loadStaticData() {
   const store = useStore.getState()
   store.setLoading(true)
   try {
-    const [statsRes, h3Res, odRes, monthsRes, hourlyByMonthRes, metadataRes] = await Promise.all([
+    const [statsRes, h3Res, odRes, monthsRes, hourlyByMonthRes, metadataRes, monthsByServiceRes, hourlyByServiceMonthRes] = await Promise.all([
       fetch('/data/stats.json').then((res) => {
         if (!res.ok) throw new Error('Failed to fetch stats')
         return res.json()
@@ -37,19 +38,29 @@ export async function loadStaticData() {
         return res.json()
       }),
       fetch('/data/metadata.json').then((res) => res.ok ? res.json() : null).catch(() => null),
+      fetch('/data/months_by_service.json').then((res) => res.ok ? res.json() : null).catch(() => null),
+      fetch('/data/hourly_volume_by_service_month.json').then((res) => res.ok ? res.json() : null).catch(() => null),
     ])
 
-    const months = monthsRes as MonthDatum[]
-    const hourlyByMonth = hourlyByMonthRes as Record<string, HourlyVolumeDatum[]>
-    const latestMonth = months[months.length - 1]?.id || store.selectedMonth
+    const metadata = metadataRes as PipelineMetadata | null
+    const selectedService = metadata?.available_services?.[0] || store.selectedService
+    const months = (monthsByServiceRes || monthsRes) as MonthDatum[]
+    const hourlyByServiceMonth = (hourlyByServiceMonthRes || {}) as Record<string, Record<string, HourlyVolumeDatum[]>>
+    const hourlyByMonth = hourlyByServiceMonthRes
+      ? (hourlyByServiceMonth[selectedService] || {})
+      : hourlyByMonthRes as Record<string, HourlyVolumeDatum[]>
+    const serviceMonths = months.filter((month) => !month.service_type || month.service_type === selectedService)
+    const latestMonth = serviceMonths[serviceMonths.length - 1]?.id || months[months.length - 1]?.id || store.selectedMonth
     store.setAvailableMonths(months)
+    store.setSelectedService(selectedService)
     store.setSelectedMonth(latestMonth)
     store.setHourlyVolumeByMonth(hourlyByMonth)
+    store.setHourlyVolumeByServiceMonth(hourlyByServiceMonth)
     store.setHourlyVolume(hourlyByMonth[latestMonth] || [])
     store.setStats(statsRes as StatsDatum)
     store.setH3Data(h3Res as H3Datum[])
     store.setOdFlows(odRes as ODFlowDatum[])
-    store.setMetadata(metadataRes as PipelineMetadata | null)
+    store.setMetadata(metadata)
     store.setError(null)
   } catch (error: unknown) {
     console.error('Failed to load static configuration data:', error)
@@ -89,15 +100,20 @@ function buildCumulativeStats(month: string, hour: number) {
 export async function loadTripsForHour(hour: number, month?: string) {
   const store = useStore.getState()
   const activeMonth = month || store.selectedMonth
+  const activeService = store.selectedService
   store.setLoading(true)
   try {
     const { conn } = await getDuckDB()
+    const describeResult = await conn.query("DESCRIBE SELECT * FROM 'trip_paths.parquet'")
+    const tripColumns = new Set((describeResult.toArray() as ArrowRow<{ column_name: string }>[]).map((row) => row.toJSON().column_name))
+    const hasServiceType = tripColumns.has('service_type')
+    const serviceFilter = hasServiceType ? `AND service_type = '${activeService}'` : ''
     
     // Query 1: Get trips for the current active hour (for maps)
     const tripsQuery = `
-      SELECT vendor, trip_distance, fare, path 
+      SELECT ${hasServiceType ? 'service_type,' : ''} vendor, trip_distance, fare, path 
       FROM 'trip_paths.parquet' 
-      WHERE month = '${activeMonth}' AND hour = ${hour}
+      WHERE month = '${activeMonth}' AND hour = ${hour} ${serviceFilter}
     `
     const tripsResult = await conn.query(tripsQuery)
     const tripsRows = tripsResult.toArray() as ArrowRow<TripRow>[]
@@ -113,6 +129,7 @@ export async function loadTripsForHour(hour: number, month?: string) {
       
       parsedTrips.push({
         vendor: rowObj.vendor,
+        service_type: rowObj.service_type,
         segments: segments,
       })
       
@@ -176,5 +193,7 @@ export async function loadTripsForHour(hour: number, month?: string) {
 export async function loadHourlyVolume(month?: string) {
   const store = useStore.getState()
   const activeMonth = month || store.selectedMonth
-  store.setHourlyVolume(store.hourlyVolumeByMonth[activeMonth] || [])
+  const activeService = store.selectedService
+  const serviceRows = store.hourlyVolumeByServiceMonth[activeService]?.[activeMonth]
+  store.setHourlyVolume(serviceRows || store.hourlyVolumeByMonth[activeMonth] || [])
 }

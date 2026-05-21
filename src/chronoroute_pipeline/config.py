@@ -29,5 +29,9 @@ TAXI_ZONE_LOOKUP_PATHS = (
     REFERENCE_DIR / "taxi_zone_lookup.csv",
     DATA_DIR / "taxi_zone_lookup.csv",
 )
+TAXI_ZONES_GEOJSON_PATHS = (
+    REFERENCE_DIR / "taxi_zones.json",
+    DATA_DIR / "taxi_zones.json",
+)
 
 DEFAULT_INTERACTIVE_RECORDS_PER_SERVICE_MONTH = 30_000

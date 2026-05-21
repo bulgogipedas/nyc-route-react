@@ -1,7 +1,7 @@
 import { useStore } from '../store/useStore'
 
 export default function KPIStats() {
-  const { stats, isLoading, metadata } = useStore()
+  const { stats, isLoading } = useStore()
 
   if (isLoading && !stats) {
     return (
@@ -45,10 +45,8 @@ export default function KPIStats() {
       textColor: 'text-primary',
     },
     {
-      title: metadata?.available_services && metadata.available_services.length > 1 ? 'SERVICES INDEXED' : 'TOTAL REVENUE',
-      value: metadata?.available_services && metadata.available_services.length > 1
-        ? metadata.available_services.length.toString()
-        : stats ? formatRevenue(stats.total_revenue) : '$69.08M',
+      title: 'TOTAL REVENUE',
+      value: stats ? formatRevenue(stats.total_revenue) : '$69.08M',
       valueClass: 'text-[26px] xl:text-[30px]',
       bgColor: 'bg-block-pink',
       textColor: 'text-primary',

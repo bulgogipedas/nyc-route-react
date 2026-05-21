@@ -138,6 +138,12 @@ Run pipeline checks:
 python scripts/run_pipeline.py --month 2026-03 --services yellow green fhv fhvhv --check-only
 ```
 
+Download TLC Parquet files without transforming them:
+
+```bash
+python scripts/run_pipeline.py --start-month 2026-01 --end-month 2026-03 --services yellow green fhv fhvhv --download-only
+```
+
 Run a local batch pipeline:
 
 ```bash

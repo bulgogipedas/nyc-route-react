@@ -9,6 +9,8 @@ PROJECT_NAME = "ChronoRoute"
 TLC_SOURCE_NAME = "NYC TLC Trip Record Data"
 TLC_SOURCE_PAGE = "https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page"
 TLC_TRIP_DATA_BASE_URL = "https://d37ci6vzurychx.cloudfront.net/trip-data"
+TLC_MISC_BASE_URL = "https://d37ci6vzurychx.cloudfront.net/misc"
+TAXI_ZONE_LOOKUP_URL = f"{TLC_MISC_BASE_URL}/taxi_zone_lookup.csv"
 
 SUPPORTED_SERVICES = ("yellow", "green", "fhv", "fhvhv")
 SERVICE_DISPLAY_NAMES = {

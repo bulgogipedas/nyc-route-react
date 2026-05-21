@@ -25,6 +25,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--overwrite", action="store_true", help="Redownload bronze files if they already exist.")
     parser.add_argument("--validate-only", action="store_true", help="Run validation checks without ingesting or transforming.")
     parser.add_argument("--check-only", action="store_true", help="Only check TLC source availability.")
+    parser.add_argument("--download-only", action="store_true", help="Download available bronze files without transforming them.")
+    parser.add_argument("--skip-reference-data", action="store_true", help="Skip automatic reference data download.")
     return parser.parse_args()
 
 
@@ -38,11 +40,16 @@ def main() -> int:
     months = [args.month] if args.month else list_target_months(args.start_month, args.end_month)
     statuses = []
     if not args.check_only:
-        from chronoroute_pipeline.aggregate import generate_combined_service_metrics, generate_gold_for_service
-        from chronoroute_pipeline.export import export_frontend_artifacts
         from chronoroute_pipeline.ingest import download_month
-        from chronoroute_pipeline.transform import clean_month
-        from chronoroute_pipeline.validate import validate_raw_month, validate_silver_month
+        from chronoroute_pipeline.reference import download_taxi_zone_lookup
+        if not args.download_only:
+            from chronoroute_pipeline.aggregate import generate_combined_service_metrics, generate_gold_for_service
+            from chronoroute_pipeline.export import export_frontend_artifacts
+            from chronoroute_pipeline.transform import clean_month
+            from chronoroute_pipeline.validate import validate_raw_month, validate_silver_month
+
+        if not args.skip_reference_data:
+            statuses.append(download_taxi_zone_lookup(overwrite=args.overwrite))
 
     for month in months:
         year, month_num = split_month(month)
@@ -57,15 +64,17 @@ def main() -> int:
                 continue
             status = download_month(service, year, month_num, overwrite=args.overwrite)
             statuses.append(status)
+            if args.download_only:
+                continue
             if status["status"] in {"downloaded", "skipped"}:
                 statuses.append(validate_raw_month(service, year, month_num))
                 statuses.append(clean_month(service, year, month_num))
                 statuses.append(validate_silver_month(service, year, month_num))
                 statuses.append(generate_gold_for_service(service, year, month_num))
-        if not args.check_only and not args.validate_only:
+        if not args.check_only and not args.validate_only and not args.download_only:
             processed_services = [service for service in args.services if any(item.get("service_type") == service and item.get("month") == month for item in statuses)]
             statuses.append(generate_combined_service_metrics(month, processed_services))
-    if not args.check_only and not args.validate_only:
+    if not args.check_only and not args.validate_only and not args.download_only:
         statuses.append(export_frontend_artifacts(months, args.services))
     for status in statuses:
         print(status)

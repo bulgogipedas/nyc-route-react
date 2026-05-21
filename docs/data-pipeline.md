@@ -21,3 +21,15 @@ ChronoRoute uses a batch-first data engineering layout so large TLC files are pr
 8. Export frontend metadata while preserving the existing dashboard artifacts.
 
 If a service is unavailable, the pipeline skips that service and continues with the available ones.
+
+## No Manual Download Required
+
+Use the CLI to download TLC Parquet files directly from the official CloudFront URLs:
+
+```bash
+python scripts/run_pipeline.py --start-month 2026-01 --end-month 2026-03 --services yellow green fhv fhvhv --download-only
+```
+
+The same download step is part of the Airflow DAG. Raw files land in `data/bronze/{service}/YYYY-MM.parquet` and remain ignored by git.
+
+The CLI also downloads `data/reference/taxi_zone_lookup.csv` unless `--skip-reference-data` is provided.

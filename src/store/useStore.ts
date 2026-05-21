@@ -54,6 +54,25 @@ export interface StatsDatum {
   total_revenue: number
 }
 
+export interface PipelineMetadata {
+  project: string
+  source: string
+  generated_at: string
+  pipeline_version: string
+  available_services: string[]
+  available_months_by_service: Record<string, string[]>
+  layers: Record<string, string>
+  airflow: {
+    dag_id: string
+    schedule: string
+  }
+  artifacts: {
+    name: string
+    path: string
+    bytes?: number
+  }[]
+}
+
 interface UIState {
   selectedMonth: string
   timeHour: number
@@ -74,6 +93,7 @@ interface DataState {
   odFlows: ODFlowDatum[]
   hourlyVolume: HourlyVolumeDatum[]
   hourlyVolumeByMonth: Record<string, HourlyVolumeDatum[]>
+  metadata: PipelineMetadata | null
   isLoading: boolean
   error: string | null
 }
@@ -95,6 +115,7 @@ type StoreState = UIState & DataState & {
   setOdFlows: (odFlows: ODFlowDatum[]) => void
   setHourlyVolume: (hourlyVolume: HourlyVolumeDatum[]) => void
   setHourlyVolumeByMonth: (hourlyVolumeByMonth: DataState['hourlyVolumeByMonth']) => void
+  setMetadata: (metadata: PipelineMetadata | null) => void
   setLoading: (isLoading: boolean) => void
   setError: (error: string | null) => void
 }
@@ -125,6 +146,7 @@ export const useStore = create<StoreState>((set) => ({
   odFlows: [],
   hourlyVolume: [],
   hourlyVolumeByMonth: {},
+  metadata: null,
   isLoading: false,
   error: null,
 
@@ -149,6 +171,7 @@ export const useStore = create<StoreState>((set) => ({
   setOdFlows: (odFlows) => set({ odFlows }),
   setHourlyVolume: (hourlyVolume) => set({ hourlyVolume }),
   setHourlyVolumeByMonth: (hourlyVolumeByMonth) => set({ hourlyVolumeByMonth }),
+  setMetadata: (metadata) => set({ metadata }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
 }))

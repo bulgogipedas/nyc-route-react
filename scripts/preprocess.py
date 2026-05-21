@@ -1,3 +1,10 @@
+"""Legacy frontend artifact builder for the current Yellow Taxi dashboard.
+
+The reusable multi-service batch pipeline lives in `src/chronoroute_pipeline`.
+This script is kept for compatibility with the existing browser artifact
+contract while the Airflow/CLI pipeline grows around it.
+"""
+
 import pandas as pd
 import json
 import h3

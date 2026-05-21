@@ -1,0 +1,54 @@
+{
+  "project": "ChronoRoute",
+  "source": "NYC TLC Trip Record Data",
+  "generated_at": "2026-05-22T00:00:00+07:00",
+  "pipeline_version": "0.1.0",
+  "available_services": [
+    "yellow"
+  ],
+  "available_months_by_service": {
+    "yellow": [
+      "2026-01",
+      "2026-02",
+      "2026-03"
+    ],
+    "green": [],
+    "fhv": [],
+    "fhvhv": []
+  },
+  "layers": {
+    "bronze": "Raw TLC parquet files",
+    "silver": "Cleaned normalized trip records",
+    "gold": "Dashboard-ready analytics aggregates"
+  },
+  "airflow": {
+    "dag_id": "chronoroute_monthly_pipeline",
+    "schedule": "monthly"
+  },
+  "artifacts": [
+    {
+      "name": "trip_paths.parquet",
+      "path": "/data/trip_paths.parquet"
+    },
+    {
+      "name": "months.json",
+      "path": "/data/months.json"
+    },
+    {
+      "name": "hourly_volume_by_month.json",
+      "path": "/data/hourly_volume_by_month.json"
+    },
+    {
+      "name": "stats.json",
+      "path": "/data/stats.json"
+    },
+    {
+      "name": "h3_deadhead.json",
+      "path": "/data/h3_deadhead.json"
+    },
+    {
+      "name": "od_flows.json",
+      "path": "/data/od_flows.json"
+    }
+  ]
+}

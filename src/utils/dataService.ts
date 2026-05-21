@@ -1,5 +1,5 @@
 import { getDuckDB } from './duckdb'
-import { useStore, type H3Datum, type HourlyVolumeDatum, type MonthDatum, type ODFlowDatum, type StatsDatum, type TripDatum, type TripSegment } from '../store/useStore'
+import { useStore, type H3Datum, type HourlyVolumeDatum, type MonthDatum, type ODFlowDatum, type PipelineMetadata, type StatsDatum, type TripDatum, type TripSegment } from '../store/useStore'
 import { latLngToCell, cellToLatLng } from 'h3-js'
 
 interface TripRow {
@@ -15,7 +15,7 @@ export async function loadStaticData() {
   const store = useStore.getState()
   store.setLoading(true)
   try {
-    const [statsRes, h3Res, odRes, monthsRes, hourlyByMonthRes] = await Promise.all([
+    const [statsRes, h3Res, odRes, monthsRes, hourlyByMonthRes, metadataRes] = await Promise.all([
       fetch('/data/stats.json').then((res) => {
         if (!res.ok) throw new Error('Failed to fetch stats')
         return res.json()
@@ -36,6 +36,7 @@ export async function loadStaticData() {
         if (!res.ok) throw new Error('Failed to fetch hourly volume by month')
         return res.json()
       }),
+      fetch('/data/metadata.json').then((res) => res.ok ? res.json() : null).catch(() => null),
     ])
 
     const months = monthsRes as MonthDatum[]
@@ -48,6 +49,7 @@ export async function loadStaticData() {
     store.setStats(statsRes as StatsDatum)
     store.setH3Data(h3Res as H3Datum[])
     store.setOdFlows(odRes as ODFlowDatum[])
+    store.setMetadata(metadataRes as PipelineMetadata | null)
     store.setError(null)
   } catch (error: unknown) {
     console.error('Failed to load static configuration data:', error)

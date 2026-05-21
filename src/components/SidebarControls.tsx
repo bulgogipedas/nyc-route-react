@@ -51,6 +51,7 @@ export default function SidebarControls() {
     setSelectedMonth,
     setTimeHour,
     isLoading,
+    metadata,
   } = useStore()
 
   // Format hour for display
@@ -71,6 +72,10 @@ export default function SidebarControls() {
   const deficitZones = h3Data.filter((item) => item.deadhead_metric < 0).length
   const surplusZones = h3Data.filter((item) => item.deadhead_metric > 0).length
   const strongestFlow = odFlows[0]?.count || 0
+  const generatedAt = metadata?.generated_at ? new Date(metadata.generated_at) : null
+  const generatedAtLabel = generatedAt && !Number.isNaN(generatedAt.getTime())
+    ? generatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : null
 
   return (
     <div className="w-[380px] bg-primary text-canvas flex flex-col h-full border-r border-hairline/15 p-6 space-y-6 overflow-y-auto">
@@ -80,8 +85,23 @@ export default function SidebarControls() {
           Chrono<span className="text-block-lime font-bold">Route</span>
         </h1>
         <p className="text-[13px] text-canvas/75 font-sans leading-relaxed mt-2">
-          Visual analytics dashboard for NYC Yellow Taxi fleet distribution and transit flows in Manhattan.
+          Geospatial data engineering and analytics for NYC TLC taxi and for-hire mobility.
         </p>
+        {metadata && (
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-canvas/60">
+            <span className="rounded-sm border border-hairline/15 px-2 py-1">
+              v{metadata.pipeline_version}
+            </span>
+            <span className="rounded-sm border border-hairline/15 px-2 py-1">
+              {metadata.available_services.length} service{metadata.available_services.length === 1 ? '' : 's'}
+            </span>
+            {generatedAtLabel && (
+              <span className="rounded-sm border border-hairline/15 px-2 py-1">
+                Updated {generatedAtLabel}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="h-px bg-hairline/15" />

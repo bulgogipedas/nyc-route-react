@@ -1,0 +1,23 @@
+# ChronoRoute Data Pipeline
+
+ChronoRoute uses a batch-first data engineering layout so large TLC files are processed outside the browser and only compact artifacts are shipped with the static frontend.
+
+## Layers
+
+- Bronze: raw TLC Parquet files downloaded by service and month.
+- Silver: cleaned canonical trip records with consistent column names and time features.
+- Gold: aggregate datasets for dashboards, service comparison, and data science workflows.
+- Public data: compact frontend artifacts and `metadata.json`.
+
+## Monthly Flow
+
+1. Build the TLC URL for each requested service and month.
+2. Check file availability with HTTP HEAD and a lightweight GET fallback.
+3. Download available services into `data/bronze/{service}/YYYY-MM.parquet`.
+4. Validate raw files.
+5. Normalize schemas into `data/silver/{service}/YYYY-MM_cleaned.parquet`.
+6. Validate silver outputs.
+7. Generate per-service and combined gold metrics.
+8. Export frontend metadata while preserving the existing dashboard artifacts.
+
+If a service is unavailable, the pipeline skips that service and continues with the available ones.

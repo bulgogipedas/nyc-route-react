@@ -1,0 +1,16 @@
+{
+  "name": "ChronoRoute",
+  "short_name": "ChronoRoute",
+  "description": "Interactive NYC Yellow Taxi analytics dashboard using official TLC Trip Record Data.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#00003c",
+  "theme_color": "#00003c",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

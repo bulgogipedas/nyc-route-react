@@ -63,6 +63,25 @@ Preview the production build:
 bun run preview
 ```
 
+## Deploy
+
+This is a Vite static app and can be deployed to Vercel or Netlify.
+
+Vercel:
+
+- Framework preset: Vite
+- Build command: `bun run build`
+- Output directory: `dist`
+- SPA rewrites and cache headers are configured in `vercel.json`.
+
+Netlify:
+
+- Build command: `bun run build`
+- Publish directory: `dist`
+- SPA redirects and cache headers are configured in `netlify.toml` and `public/_redirects`.
+
+After choosing the final production domain, add an absolute canonical URL and sitemap URL for stronger search indexing.
+
 ## How To Read The Dashboard
 
 Pink map areas mean pickups are outpacing nearby dropoffs. These areas likely need more taxis.

@@ -3,8 +3,56 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>project-root</title>
+    <meta name="theme-color" content="#00003c" />
+    <meta name="color-scheme" content="dark light" />
+    <meta
+      name="description"
+      content="ChronoRoute is an interactive NYC Yellow Taxi analytics dashboard using official TLC Trip Record Data to explore Manhattan demand, taxi supply balance, and passenger flow corridors."
+    />
+    <meta
+      name="keywords"
+      content="NYC taxi data, TLC trip record data, yellow taxi analytics, Manhattan mobility dashboard, Deck.gl, DuckDB, MapLibre"
+    />
+    <meta name="author" content="ChronoRoute" />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ChronoRoute | NYC Yellow Taxi Analytics" />
+    <meta
+      property="og:description"
+      content="Explore NYC TLC Yellow Taxi records through hourly Manhattan demand hotspots, taxi supply balance, and passenger movement corridors."
+    />
+    <meta property="og:image" content="/og-image.svg" />
+    <meta property="og:site_name" content="ChronoRoute" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ChronoRoute | NYC Yellow Taxi Analytics" />
+    <meta
+      name="twitter:description"
+      content="Interactive browser-based visual analytics for NYC TLC Yellow Taxi Trip Record Data."
+    />
+    <meta name="twitter:image" content="/og-image.svg" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ChronoRoute",
+        "applicationCategory": "DataVisualizationApplication",
+        "operatingSystem": "Web",
+        "description": "Interactive visual analytics dashboard for NYC TLC Yellow Taxi Trip Record Data in Manhattan.",
+        "keywords": "NYC TLC Trip Record Data, taxi analytics, Manhattan mobility, data visualization",
+        "isAccessibleForFree": true,
+        "creator": {
+          "@type": "Organization",
+          "name": "ChronoRoute"
+        }
+      }
+    </script>
+
+    <title>ChronoRoute | NYC Yellow Taxi Analytics</title>
   </head>
   <body>
     <div id="root"></div>

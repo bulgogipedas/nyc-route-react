@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "project-root",
+      "name": "chronoroute",
       "dependencies": {
         "@duckdb/duckdb-wasm": "^1.33.1-dev45.0",
         "clsx": "^2.1.1",

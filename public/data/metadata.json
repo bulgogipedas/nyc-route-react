@@ -1,10 +1,13 @@
 {
   "project": "ChronoRoute",
   "source": "NYC TLC Trip Record Data",
-  "generated_at": "2026-05-22T00:00:00+07:00",
+  "generated_at": "2026-05-21T21:21:04.839978+00:00",
   "pipeline_version": "0.1.0",
   "available_services": [
-    "yellow"
+    "yellow",
+    "green",
+    "fhv",
+    "fhvhv"
   ],
   "available_months_by_service": {
     "yellow": [
@@ -12,9 +15,21 @@
       "2026-02",
       "2026-03"
     ],
-    "green": [],
-    "fhv": [],
-    "fhvhv": []
+    "green": [
+      "2026-01",
+      "2026-02",
+      "2026-03"
+    ],
+    "fhv": [
+      "2026-01",
+      "2026-02",
+      "2026-03"
+    ],
+    "fhvhv": [
+      "2026-01",
+      "2026-02",
+      "2026-03"
+    ]
   },
   "layers": {
     "bronze": "Raw TLC parquet files",
@@ -27,28 +42,69 @@
   },
   "artifacts": [
     {
-      "name": "trip_paths.parquet",
-      "path": "/data/trip_paths.parquet"
-    },
-    {
-      "name": "months.json",
-      "path": "/data/months.json"
-    },
-    {
-      "name": "hourly_volume_by_month.json",
-      "path": "/data/hourly_volume_by_month.json"
-    },
-    {
-      "name": "stats.json",
-      "path": "/data/stats.json"
+      "name": "h3_data.json",
+      "path": "/data/h3_data.json",
+      "bytes": 2440
     },
     {
       "name": "h3_deadhead.json",
-      "path": "/data/h3_deadhead.json"
+      "path": "/data/h3_deadhead.json",
+      "bytes": 4740
+    },
+    {
+      "name": "hourly_volume_by_month.json",
+      "path": "/data/hourly_volume_by_month.json",
+      "bytes": 6424
+    },
+    {
+      "name": "hourly_volume_by_service_month.json",
+      "path": "/data/hourly_volume_by_service_month.json",
+      "bytes": 27735
+    },
+    {
+      "name": "metadata.json",
+      "path": "/data/metadata.json",
+      "bytes": 2007
+    },
+    {
+      "name": "monthly_stats.json",
+      "path": "/data/monthly_stats.json",
+      "bytes": 368
+    },
+    {
+      "name": "monthly_stats_by_service.json",
+      "path": "/data/monthly_stats_by_service.json",
+      "bytes": 1297
+    },
+    {
+      "name": "months.json",
+      "path": "/data/months.json",
+      "bytes": 1055
+    },
+    {
+      "name": "months_by_service.json",
+      "path": "/data/months_by_service.json",
+      "bytes": 4343
     },
     {
       "name": "od_flows.json",
-      "path": "/data/od_flows.json"
+      "path": "/data/od_flows.json",
+      "bytes": 36746
+    },
+    {
+      "name": "stats.json",
+      "path": "/data/stats.json",
+      "bytes": 113
+    },
+    {
+      "name": "trip_paths.parquet",
+      "path": "/data/trip_paths.parquet",
+      "bytes": 11467506
+    },
+    {
+      "name": "trips_sample.json",
+      "path": "/data/trips_sample.json",
+      "bytes": 2504488
     }
   ]
 }

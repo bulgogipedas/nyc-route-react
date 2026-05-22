@@ -33,3 +33,9 @@ python scripts/run_pipeline.py --start-month 2026-01 --end-month 2026-03 --servi
 The same download step is part of the Airflow DAG. Raw files land in `data/bronze/{service}/YYYY-MM.parquet` and remain ignored by git.
 
 The CLI also downloads `data/reference/taxi_zone_lookup.csv` unless `--skip-reference-data` is provided.
+
+To process the newest available TLC month without hardcoding the month:
+
+```bash
+python scripts/run_pipeline.py --latest-available --services yellow green fhv fhvhv
+```

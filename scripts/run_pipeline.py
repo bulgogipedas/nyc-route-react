@@ -12,7 +12,7 @@ SRC_DIR = ROOT_DIR / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from chronoroute_pipeline.tlc_source import check_tlc_file_available, list_supported_services, list_target_months
+from chronoroute_pipeline.tlc_source import check_tlc_file_available, find_latest_available_month, list_supported_services, list_target_months
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     month_group = parser.add_mutually_exclusive_group(required=True)
     month_group.add_argument("--month", help="Single target month, e.g. 2026-03")
     month_group.add_argument("--start-month", help="Start month for a range, e.g. 2026-01")
+    month_group.add_argument("--latest-available", action="store_true", help="Use the latest available TLC month for the selected services.")
     parser.add_argument("--end-month", help="End month for a range, e.g. 2026-03")
     parser.add_argument("--services", nargs="+", default=list_supported_services(), choices=list_supported_services())
     parser.add_argument("--overwrite", action="store_true", help="Redownload bronze files if they already exist.")
@@ -27,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--check-only", action="store_true", help="Only check TLC source availability.")
     parser.add_argument("--download-only", action="store_true", help="Download available bronze files without transforming them.")
     parser.add_argument("--skip-reference-data", action="store_true", help="Skip automatic reference data download.")
+    parser.add_argument("--require-all-services", action="store_true", help="For --latest-available, only choose a month where every selected service is available.")
     return parser.parse_args()
 
 
@@ -37,7 +39,14 @@ def split_month(month: str) -> tuple[int, int]:
 
 def main() -> int:
     args = parse_args()
-    months = [args.month] if args.month else list_target_months(args.start_month, args.end_month)
+    if args.latest_available:
+        latest = find_latest_available_month(args.services, require_all_services=args.require_all_services)
+        if latest is None:
+            print({"status": "unavailable", "message": "No TLC files were found in the lookback window."})
+            return 0
+        months = [latest]
+    else:
+        months = [args.month] if args.month else list_target_months(args.start_month, args.end_month)
     statuses = []
     if not args.check_only:
         from chronoroute_pipeline.ingest import download_month

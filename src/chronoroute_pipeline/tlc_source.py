@@ -69,3 +69,35 @@ def list_target_months(start_month: str, end_month: str | None = None) -> list[s
             year += 1
             month = 1
     return months
+
+
+def shift_month(month: str, offset: int) -> str:
+    current = datetime.strptime(month, "%Y-%m")
+    year = current.year
+    month_num = current.month + offset
+    while month_num < 1:
+        year -= 1
+        month_num += 12
+    while month_num > 12:
+        year += 1
+        month_num -= 12
+    return f"{year:04d}-{month_num:02d}"
+
+
+def find_latest_available_month(
+    services: list[str] | None = None,
+    end_month: str | None = None,
+    lookback_months: int = 12,
+    require_all_services: bool = False,
+) -> str | None:
+    target_services = [validate_service_type(service) for service in (services or list_supported_services())]
+    search_end = end_month or datetime.utcnow().strftime("%Y-%m")
+    for index in range(lookback_months):
+        candidate = shift_month(search_end, -index)
+        year, month = (int(part) for part in candidate.split("-"))
+        availability = [check_tlc_file_available(service, year, month) for service in target_services]
+        if require_all_services and all(availability):
+            return candidate
+        if not require_all_services and any(availability):
+            return candidate
+    return None

@@ -144,6 +144,12 @@ Download TLC Parquet files without transforming them:
 python scripts/run_pipeline.py --start-month 2026-01 --end-month 2026-03 --services yellow green fhv fhvhv --download-only
 ```
 
+Process the newest TLC month available from the official URLs:
+
+```bash
+python scripts/run_pipeline.py --latest-available --services yellow green fhv fhvhv
+```
+
 Run a local batch pipeline:
 
 ```bash

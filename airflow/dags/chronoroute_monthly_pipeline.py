@@ -17,7 +17,7 @@ from chronoroute_pipeline.config import SUPPORTED_SERVICES
 from chronoroute_pipeline.export import export_frontend_artifacts
 from chronoroute_pipeline.ingest import download_month
 from chronoroute_pipeline.reference import download_taxi_zone_lookup
-from chronoroute_pipeline.tlc_source import check_tlc_file_available
+from chronoroute_pipeline.tlc_source import check_tlc_file_available, find_latest_available_month
 from chronoroute_pipeline.transform import clean_month
 from chronoroute_pipeline.validate import validate_gold_month, validate_raw_month, validate_silver_month
 
@@ -42,13 +42,18 @@ def _split_month(month: str) -> tuple[int, int]:
     start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=["chronoroute", "nyc-tlc", "geospatial"],
-    params={"month": "", "services": list(SUPPORTED_SERVICES), "overwrite": False, "download_only": False},
+    params={"month": "", "services": list(SUPPORTED_SERVICES), "overwrite": False, "download_only": False, "require_all_services": False},
 )
 def chronoroute_monthly_pipeline():
     @task
     def determine_target_month(**context) -> str:
         requested = context["params"].get("month")
-        return requested or _previous_calendar_month(context["logical_date"])
+        if requested:
+            return requested
+        services = context["params"].get("services") or list(SUPPORTED_SERVICES)
+        require_all = bool(context["params"].get("require_all_services", False))
+        latest = find_latest_available_month(services, end_month=_previous_calendar_month(context["logical_date"]), require_all_services=require_all)
+        return latest or _previous_calendar_month(context["logical_date"])
 
     @task
     def determine_services(**context) -> list[str]:

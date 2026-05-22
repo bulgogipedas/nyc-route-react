@@ -18,10 +18,11 @@ airflow / airflow
 
 ## DAG Params
 
-- `month`: optional `YYYY-MM`; defaults to previous calendar month.
+- `month`: optional `YYYY-MM`; defaults to the latest available TLC month discovered from the official Parquet URLs.
 - `services`: list of supported services.
 - `overwrite`: redownload existing bronze files when true.
 - `download_only`: download available bronze files and reference data, then skip transform/gold/frontend export.
+- `require_all_services`: when true, automatic latest-month discovery only selects a month where every requested service is available.
 
 ## Design Rule
 

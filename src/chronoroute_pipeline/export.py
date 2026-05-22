@@ -6,6 +6,7 @@ import json
 from calendar import month_name
 from pathlib import Path
 
+import duckdb
 import pandas as pd
 
 from .config import DEFAULT_INTERACTIVE_RECORDS_PER_SERVICE_MONTH, GOLD_DIR, PUBLIC_DATA_DIR, SILVER_DIR, TAXI_ZONES_GEOJSON_PATHS, TLC_SOURCE_PAGE
@@ -15,6 +16,10 @@ from .tlc_source import get_service_display_name, validate_service_type
 
 def _silver_path(service_type: str, month: str) -> Path:
     return SILVER_DIR / service_type / f"{month}_cleaned.parquet"
+
+
+def _literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
 
 
 def _load_centroids() -> dict[int, list[float]]:
@@ -73,17 +78,38 @@ def _export_trip_paths(months: list[str], services: list[str]) -> str | None:
     centroids = _load_centroids()
     if not centroids:
         return None
+    location_ids = ",".join(str(location_id) for location_id in sorted(centroids))
     frames: list[pd.DataFrame] = []
+    con = duckdb.connect()
     for service in services:
         for month in months:
             path = _silver_path(service, month)
             if not path.exists():
                 continue
-            df = pd.read_parquet(path)
-            if df.empty:
+            count = con.sql(f"SELECT COUNT(*) FROM read_parquet({_literal(str(path))})").fetchone()[0]
+            if count == 0:
                 continue
-            sample_size = min(DEFAULT_INTERACTIVE_RECORDS_PER_SERVICE_MONTH, len(df))
-            sample = df.sample(sample_size, random_state=int(month.replace("-", "")) + len(service)).copy()
+            sample_size = min(DEFAULT_INTERACTIVE_RECORDS_PER_SERVICE_MONTH, int(count))
+            sample = con.sql(f"""
+                SELECT
+                    service_type,
+                    month,
+                    base_license_number,
+                    pickup_hour,
+                    trip_distance,
+                    fare_amount,
+                    pickup_datetime,
+                    dropoff_datetime,
+                    pickup_location_id,
+                    dropoff_location_id
+                FROM read_parquet({_literal(str(path))})
+                WHERE pickup_location_id IN ({location_ids})
+                    AND dropoff_location_id IN ({location_ids})
+                ORDER BY random()
+                LIMIT {sample_size}
+            """).df()
+            if sample.empty:
+                continue
             sample["path"] = sample.apply(lambda row: _build_path(row, centroids), axis=1)
             sample = sample.dropna(subset=["path"])
             if sample.empty:
@@ -91,13 +117,14 @@ def _export_trip_paths(months: list[str], services: list[str]) -> str | None:
             export_df = pd.DataFrame({
                 "service_type": sample["service_type"],
                 "month": sample["month"],
-                "vendor": sample.get("base_license_number", pd.Series([0] * len(sample))).fillna(0),
+                "vendor": sample.get("base_license_number", pd.Series(["unknown"] * len(sample))).fillna("unknown").astype(str),
                 "hour": sample["pickup_hour"].astype(int),
                 "trip_distance": sample["trip_distance"],
                 "fare": sample["fare_amount"],
                 "path": sample["path"],
             })
             frames.append(export_df)
+    con.close()
     if not frames:
         return None
     output = pd.concat(frames, ignore_index=True)
@@ -140,8 +167,15 @@ def _export_month_and_hourly_files(months: list[str], services: list[str]) -> li
                 "total_revenue": kpi.get("total_revenue") or 0,
             }
             if hourly_path.exists():
-                hourly_df = pd.read_parquet(hourly_path)
-                active = hourly_df[(hourly_df["service_type"] == service) & (hourly_df["month"] == month)]
+                con = duckdb.connect()
+                active = con.sql(f"""
+                    SELECT hour, total_trips, avg_distance, avg_fare
+                    FROM read_parquet({_literal(str(hourly_path))})
+                    WHERE service_type = {_literal(service)}
+                        AND month = {_literal(month)}
+                    ORDER BY hour
+                """).df()
+                con.close()
                 hourly_by_service_month[service][month] = [
                     {
                         "hour": int(row.hour),

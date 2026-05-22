@@ -59,6 +59,14 @@ Yellow and Green taxi data have richer fare, passenger, and trip distance fields
 
 Optional reference data can be placed in `data/reference/taxi_zone_lookup.csv`. If it is present, the pipeline enriches LocationIDs with zone and borough labels. If it is missing, LocationID-based outputs still work.
 
+Bronze, silver, and gold are local pipeline artifacts and are not pushed to GitHub. After exporting `public/data`, you can remove reproducible local cache files with:
+
+```bash
+python scripts/cleanup_data.py --layers bronze silver legacy_raw --apply
+```
+
+Run `python scripts/cleanup_data.py` first for a dry-run audit.
+
 ## Airflow Monthly Orchestration
 
 The DAG `chronoroute_monthly_pipeline` runs monthly on the 5th day to give TLC files time to appear. It defaults to the previous calendar month and supports manual params:

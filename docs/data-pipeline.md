@@ -9,6 +9,32 @@ ChronoRoute uses a batch-first data engineering layout so large TLC files are pr
 - Gold: aggregate datasets for dashboards, service comparison, and data science workflows.
 - Public data: compact frontend artifacts and `metadata.json`.
 
+## Data Retention
+
+Only `public/data` artifacts are needed by the deployed static dashboard. The larger `data/bronze`, `data/silver`, and `data/gold` layers are local pipeline artifacts and are ignored by git.
+
+Recommended local retention:
+
+- Keep `public/data/*`: required by the app and intentionally tracked when compact enough.
+- Keep `data/gold` while doing analytics or data science work.
+- Delete `data/bronze` after a successful run if disk space matters; it can be re-downloaded from TLC.
+- Delete `data/silver` after gold/public export if you are not debugging transformations.
+- Delete legacy root files like `data/yellow_tripdata_*.parquet`; the pipeline uses `data/bronze/{service}/YYYY-MM.parquet`.
+
+Audit cleanup candidates without deleting anything:
+
+```bash
+python scripts/cleanup_data.py
+```
+
+Delete reproducible local cache layers:
+
+```bash
+python scripts/cleanup_data.py --layers bronze silver legacy_raw --apply
+```
+
+This cleanup script never deletes source code, docs, DAGs, or `public/data` dashboard artifacts.
+
 ## Monthly Flow
 
 1. Build the TLC URL for each requested service and month.

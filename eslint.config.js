@@ -6,7 +6,13 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores([
+    'dist',
+    'data/**',
+    'airflow/logs/**',
+    'public/data/*.parquet',
+    'public/data/*.json',
+  ]),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

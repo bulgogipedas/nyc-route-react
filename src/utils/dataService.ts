@@ -72,7 +72,9 @@ export async function loadStaticData() {
 
 function buildCumulativeStats(month: string, hour: number) {
   const store = useStore.getState()
-  const hourlyVolume = store.hourlyVolumeByMonth[month] || []
+  const hourlyVolume = store.hourlyVolumeByServiceMonth[store.selectedService]?.[month]
+    || store.hourlyVolumeByMonth[month]
+    || []
   const activeRows = hourlyVolume.filter((row) => row.hour <= hour)
 
   if (activeRows.length === 0) {

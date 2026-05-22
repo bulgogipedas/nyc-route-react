@@ -1,7 +1,7 @@
 {
   "project": "ChronoRoute",
   "source": "NYC TLC Trip Record Data",
-  "generated_at": "2026-05-21T21:21:04.839978+00:00",
+  "generated_at": "2026-05-22T03:11:22.189852+00:00",
   "pipeline_version": "0.1.0",
   "available_services": [
     "yellow",
@@ -64,7 +64,7 @@
     {
       "name": "metadata.json",
       "path": "/data/metadata.json",
-      "bytes": 2007
+      "bytes": 2297
     },
     {
       "name": "monthly_stats.json",
@@ -99,7 +99,7 @@
     {
       "name": "trip_paths.parquet",
       "path": "/data/trip_paths.parquet",
-      "bytes": 11467506
+      "bytes": 11469098
     },
     {
       "name": "trips_sample.json",

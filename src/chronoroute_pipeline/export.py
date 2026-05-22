@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from calendar import month_name
 from pathlib import Path
 
@@ -20,6 +21,14 @@ def _silver_path(service_type: str, month: str) -> Path:
 
 def _literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
+
+
+def _finite_number(value: object, default: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if math.isfinite(number) else default
 
 
 def _load_centroids() -> dict[int, list[float]]:
@@ -155,16 +164,16 @@ def _export_month_and_hourly_files(months: list[str], services: list[str]) -> li
                 "source": f"NYC Taxi & Limousine Commission {get_service_display_name(service)} Trip Records",
                 "source_url": TLC_SOURCE_PAGE,
                 "source_file": f"{service}_tripdata_{month}.parquet",
-                "total_trips": kpi.get("total_trips", 0),
-                "avg_distance": kpi.get("avg_distance") or 0,
-                "peak_hour": kpi.get("busiest_hour") or 0,
-                "total_revenue": kpi.get("total_revenue") or 0,
+                "total_trips": int(_finite_number(kpi.get("total_trips"), 0)),
+                "avg_distance": _finite_number(kpi.get("avg_distance"), 0),
+                "peak_hour": int(_finite_number(kpi.get("busiest_hour"), 0)),
+                "total_revenue": _finite_number(kpi.get("total_revenue"), 0),
             })
             monthly_stats[service][month] = {
-                "total_trips": kpi.get("total_trips", 0),
-                "avg_distance": kpi.get("avg_distance") or 0,
-                "peak_hour": kpi.get("busiest_hour") or 0,
-                "total_revenue": kpi.get("total_revenue") or 0,
+                "total_trips": int(_finite_number(kpi.get("total_trips"), 0)),
+                "avg_distance": _finite_number(kpi.get("avg_distance"), 0),
+                "peak_hour": int(_finite_number(kpi.get("busiest_hour"), 0)),
+                "total_revenue": _finite_number(kpi.get("total_revenue"), 0),
             }
             if hourly_path.exists():
                 con = duckdb.connect()
@@ -179,9 +188,9 @@ def _export_month_and_hourly_files(months: list[str], services: list[str]) -> li
                 hourly_by_service_month[service][month] = [
                     {
                         "hour": int(row.hour),
-                        "count": int(row.total_trips),
-                        "total_distance": float((row.avg_distance or 0) * row.total_trips),
-                        "total_revenue": float((row.avg_fare or 0) * row.total_trips),
+                        "count": int(_finite_number(row.total_trips, 0)),
+                        "total_distance": _finite_number(row.avg_distance, 0) * _finite_number(row.total_trips, 0),
+                        "total_revenue": _finite_number(row.avg_fare, 0) * _finite_number(row.total_trips, 0),
                     }
                     for row in active.itertuples(index=False)
                 ]

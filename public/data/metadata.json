@@ -1,7 +1,7 @@
 {
   "project": "ChronoRoute",
   "source": "NYC TLC Trip Record Data",
-  "generated_at": "2026-05-22T03:11:22.189852+00:00",
+  "generated_at": "2026-05-23T10:32:40.394Z",
   "pipeline_version": "0.1.0",
   "available_services": [
     "yellow",
@@ -13,12 +13,14 @@
     "yellow": [
       "2026-01",
       "2026-02",
-      "2026-03"
+      "2026-03",
+      "2026-04"
     ],
     "green": [
       "2026-01",
       "2026-02",
-      "2026-03"
+      "2026-03",
+      "2026-04"
     ],
     "fhv": [
       "2026-01",
@@ -28,7 +30,8 @@
     "fhvhv": [
       "2026-01",
       "2026-02",
-      "2026-03"
+      "2026-03",
+      "2026-04"
     ]
   },
   "layers": {
@@ -59,12 +62,12 @@
     {
       "name": "hourly_volume_by_service_month.json",
       "path": "/data/hourly_volume_by_service_month.json",
-      "bytes": 27735
+      "bytes": 31963
     },
     {
       "name": "metadata.json",
       "path": "/data/metadata.json",
-      "bytes": 2297
+      "bytes": 2111
     },
     {
       "name": "monthly_stats.json",
@@ -74,7 +77,7 @@
     {
       "name": "monthly_stats_by_service.json",
       "path": "/data/monthly_stats_by_service.json",
-      "bytes": 1297
+      "bytes": 1486
     },
     {
       "name": "months.json",
@@ -84,7 +87,7 @@
     {
       "name": "months_by_service.json",
       "path": "/data/months_by_service.json",
-      "bytes": 4343
+      "bytes": 5142
     },
     {
       "name": "od_flows.json",
@@ -99,7 +102,7 @@
     {
       "name": "trip_paths.parquet",
       "path": "/data/trip_paths.parquet",
-      "bytes": 11469098
+      "bytes": 5752086
     },
     {
       "name": "trips_sample.json",

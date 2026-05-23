@@ -8,7 +8,6 @@ from calendar import month_name
 from pathlib import Path
 
 import duckdb
-import pandas as pd
 
 from .config import DEFAULT_INTERACTIVE_RECORDS_PER_SERVICE_MONTH, GOLD_DIR, PUBLIC_DATA_DIR, SILVER_DIR, TAXI_ZONES_GEOJSON_PATHS, TLC_SOURCE_PAGE
 from .metadata import write_metadata
@@ -59,86 +58,98 @@ def _load_centroids() -> dict[int, list[float]]:
     return {}
 
 
-def _build_path(row: pd.Series, centroids: dict[int, list[float]]) -> str | None:
-    try:
-        pickup_id = int(row["pickup_location_id"])
-        dropoff_id = int(row["dropoff_location_id"])
-    except (TypeError, ValueError):
-        return None
-    pickup = centroids.get(pickup_id)
-    dropoff = centroids.get(dropoff_id)
-    if not pickup or not dropoff:
-        return None
-    pickup_dt = pd.to_datetime(row["pickup_datetime"], errors="coerce")
-    dropoff_dt = pd.to_datetime(row["dropoff_datetime"], errors="coerce")
-    if pd.isna(pickup_dt):
-        return None
-    start = int(pickup_dt.hour * 3600 + pickup_dt.minute * 60 + pickup_dt.second)
-    if pd.isna(dropoff_dt):
-        end = start + 600
-    else:
-        end = int(dropoff_dt.hour * 3600 + dropoff_dt.minute * 60 + dropoff_dt.second)
-        if end <= start:
-            end = start + 600
-    return json.dumps([[pickup[0], pickup[1], start], [dropoff[0], dropoff[1], end]])
+def _centroid_values_sql(centroids: dict[int, list[float]]) -> str:
+    rows = [
+        f"({location_id}, {coords[0]}, {coords[1]})"
+        for location_id, coords in sorted(centroids.items())
+    ]
+    return "(VALUES " + ", ".join(rows) + ")"
 
 
 def _export_trip_paths(months: list[str], services: list[str]) -> str | None:
     centroids = _load_centroids()
     if not centroids:
         return None
-    location_ids = ",".join(str(location_id) for location_id in sorted(centroids))
-    frames: list[pd.DataFrame] = []
+    centroid_sql = _centroid_values_sql(centroids)
+    queries: list[str] = []
     con = duckdb.connect()
     for service in services:
         for month in months:
             path = _silver_path(service, month)
             if not path.exists():
                 continue
-            count = con.sql(f"SELECT COUNT(*) FROM read_parquet({_literal(str(path))})").fetchone()[0]
-            if count == 0:
-                continue
-            sample_size = min(DEFAULT_INTERACTIVE_RECORDS_PER_SERVICE_MONTH, int(count))
-            sample = con.sql(f"""
+            queries.append(f"""
                 SELECT
                     service_type,
                     month,
-                    base_license_number,
-                    pickup_hour,
+                    COALESCE(CAST(base_license_number AS VARCHAR), 'unknown') AS vendor,
+                    CAST(pickup_hour AS INTEGER) AS hour,
                     trip_distance,
-                    fare_amount,
-                    pickup_datetime,
-                    dropoff_datetime,
-                    pickup_location_id,
-                    dropoff_location_id
-                FROM read_parquet({_literal(str(path))})
-                WHERE pickup_location_id IN ({location_ids})
-                    AND dropoff_location_id IN ({location_ids})
-                ORDER BY random()
-                LIMIT {sample_size}
-            """).df()
-            if sample.empty:
-                continue
-            sample["path"] = sample.apply(lambda row: _build_path(row, centroids), axis=1)
-            sample = sample.dropna(subset=["path"])
-            if sample.empty:
-                continue
-            export_df = pd.DataFrame({
-                "service_type": sample["service_type"],
-                "month": sample["month"],
-                "vendor": sample.get("base_license_number", pd.Series(["unknown"] * len(sample))).fillna("unknown").astype(str),
-                "hour": sample["pickup_hour"].astype(int),
-                "trip_distance": sample["trip_distance"],
-                "fare": sample["fare_amount"],
-                "path": sample["path"],
-            })
-            frames.append(export_df)
-    con.close()
-    if not frames:
+                    fare_amount AS fare,
+                    '[[' || pickup_lon || ',' || pickup_lat || ',' || start_second || '],[' ||
+                        dropoff_lon || ',' || dropoff_lat || ',' || end_second || ']]' AS path
+                FROM (
+                    SELECT
+                        service_type,
+                        month,
+                        base_license_number,
+                        pickup_hour,
+                        trip_distance,
+                        fare_amount,
+                        pickup_lon,
+                        pickup_lat,
+                        dropoff_lon,
+                        dropoff_lat,
+                        EXTRACT('hour' FROM pickup_datetime) * 3600
+                            + EXTRACT('minute' FROM pickup_datetime) * 60
+                            + EXTRACT('second' FROM pickup_datetime) AS start_second,
+                        CASE
+                            WHEN dropoff_datetime IS NULL THEN
+                                EXTRACT('hour' FROM pickup_datetime) * 3600
+                                + EXTRACT('minute' FROM pickup_datetime) * 60
+                                + EXTRACT('second' FROM pickup_datetime) + 600
+                            WHEN (
+                                EXTRACT('hour' FROM dropoff_datetime) * 3600
+                                + EXTRACT('minute' FROM dropoff_datetime) * 60
+                                + EXTRACT('second' FROM dropoff_datetime)
+                            ) <= (
+                                EXTRACT('hour' FROM pickup_datetime) * 3600
+                                + EXTRACT('minute' FROM pickup_datetime) * 60
+                                + EXTRACT('second' FROM pickup_datetime)
+                            ) THEN
+                                EXTRACT('hour' FROM pickup_datetime) * 3600
+                                + EXTRACT('minute' FROM pickup_datetime) * 60
+                                + EXTRACT('second' FROM pickup_datetime) + 600
+                            ELSE
+                                EXTRACT('hour' FROM dropoff_datetime) * 3600
+                                + EXTRACT('minute' FROM dropoff_datetime) * 60
+                                + EXTRACT('second' FROM dropoff_datetime)
+                        END AS end_second
+                    FROM (
+                        SELECT
+                            trips.*,
+                            pickup_centroids.lon AS pickup_lon,
+                            pickup_centroids.lat AS pickup_lat,
+                            dropoff_centroids.lon AS dropoff_lon,
+                            dropoff_centroids.lat AS dropoff_lat
+                        FROM (
+                            SELECT *
+                            FROM read_parquet({_literal(str(path))})
+                            LIMIT {DEFAULT_INTERACTIVE_RECORDS_PER_SERVICE_MONTH}
+                        ) trips
+                        JOIN {centroid_sql} AS pickup_centroids(location_id, lon, lat)
+                            ON trips.pickup_location_id = pickup_centroids.location_id
+                        JOIN {centroid_sql} AS dropoff_centroids(location_id, lon, lat)
+                            ON trips.dropoff_location_id = dropoff_centroids.location_id
+                    ) AS filtered
+                ) AS sampled
+            """)
+    if not queries:
+        con.close()
         return None
-    output = pd.concat(frames, ignore_index=True)
     output_path = PUBLIC_DATA_DIR / "trip_paths.parquet"
-    output.to_parquet(output_path, index=False)
+    con.execute(f"COPY ({' UNION ALL '.join(queries)}) TO {_literal(str(output_path))} (FORMAT PARQUET)")
+    con.close()
     return str(output_path)
 
 
@@ -183,16 +194,16 @@ def _export_month_and_hourly_files(months: list[str], services: list[str]) -> li
                     WHERE service_type = {_literal(service)}
                         AND month = {_literal(month)}
                     ORDER BY hour
-                """).df()
+                """).fetchall()
                 con.close()
                 hourly_by_service_month[service][month] = [
                     {
-                        "hour": int(row.hour),
-                        "count": int(_finite_number(row.total_trips, 0)),
-                        "total_distance": _finite_number(row.avg_distance, 0) * _finite_number(row.total_trips, 0),
-                        "total_revenue": _finite_number(row.avg_fare, 0) * _finite_number(row.total_trips, 0),
+                        "hour": int(hour),
+                        "count": int(_finite_number(total_trips, 0)),
+                        "total_distance": _finite_number(avg_distance, 0) * _finite_number(total_trips, 0),
+                        "total_revenue": _finite_number(avg_fare, 0) * _finite_number(total_trips, 0),
                     }
-                    for row in active.itertuples(index=False)
+                    for hour, total_trips, avg_distance, avg_fare in active
                 ]
     if months_payload:
         (PUBLIC_DATA_DIR / "months_by_service.json").write_text(json.dumps(months_payload))

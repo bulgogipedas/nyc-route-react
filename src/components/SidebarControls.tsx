@@ -7,7 +7,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { useStore } from '../store/useStore'
-import { Layers, Cuboid as Cube, HelpCircle, Activity, MapPinned, CalendarDays } from 'lucide-react'
+import { Layers, Cuboid as Cube, HelpCircle, Activity, MapPinned, CalendarDays, AlertCircle } from 'lucide-react'
 
 const formatCompact = (value: number) => new Intl.NumberFormat('en-US').format(Math.round(value))
 
@@ -76,10 +76,38 @@ export default function SidebarControls() {
   const strongestFlow = odFlows[0]?.count || 0
   const services = metadata?.available_services?.length ? metadata.available_services : ['yellow']
   const visibleMonths = availableMonths.filter((month) => !month.service_type || month.service_type === selectedService)
+  const allServiceMonths = metadata?.available_months_by_service
+    ? Object.values(metadata.available_months_by_service).flat()
+    : availableMonths.map((month) => month.id)
+  const latestPublishedMonth = [...new Set(allServiceMonths)].sort().at(-1)
+  const selectedServiceMonths = metadata?.available_months_by_service?.[selectedService]
+    || visibleMonths.map((month) => month.id)
+  const selectedServiceLatestMonth = [...selectedServiceMonths].sort().at(-1)
+  const selectedServiceMissingLatest = Boolean(
+    latestPublishedMonth
+    && selectedServiceLatestMonth
+    && selectedServiceLatestMonth !== latestPublishedMonth
+  )
+  const formatMonthLabel = (monthId: string) => {
+    const month = availableMonths.find((item) => item.id === monthId)
+    if (month) return month.label
+    const [year, monthNumber] = monthId.split('-')
+    return new Date(Number(year), Number(monthNumber) - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
   const generatedAt = metadata?.generated_at ? new Date(metadata.generated_at) : null
   const generatedAtLabel = generatedAt && !Number.isNaN(generatedAt.getTime())
     ? generatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null
+
+  const handleServiceSelect = (service: string) => {
+    const nextMonthIds = metadata?.available_months_by_service?.[service]
+      || availableMonths.filter((month) => !month.service_type || month.service_type === service).map((month) => month.id)
+    const nextLatestMonth = [...nextMonthIds].sort().at(-1)
+    setSelectedService(service)
+    if (nextLatestMonth && !nextMonthIds.includes(selectedMonth)) {
+      setSelectedMonth(nextLatestMonth)
+    }
+  }
 
   return (
     <div className="w-[380px] bg-primary text-canvas flex flex-col h-full border-r border-hairline/15 p-6 space-y-6 overflow-y-auto">
@@ -120,7 +148,7 @@ export default function SidebarControls() {
           {services.map((service) => (
             <button
               key={service}
-              onClick={() => setSelectedService(service)}
+              onClick={() => handleServiceSelect(service)}
               className={`min-h-10 rounded-md border px-2 py-2 text-left uppercase transition-all ${
                 selectedService === service
                   ? 'bg-block-lime text-primary border-block-lime'
@@ -131,6 +159,14 @@ export default function SidebarControls() {
             </button>
           ))}
         </div>
+        {selectedServiceMissingLatest && latestPublishedMonth && selectedServiceLatestMonth && (
+          <div className="flex gap-2 rounded-md border border-block-pink/30 bg-block-pink/10 px-3 py-2 text-[11px] leading-relaxed text-canvas/75">
+            <AlertCircle size={14} className="mt-0.5 shrink-0 text-block-pink" />
+            <span>
+              {formatMonthLabel(latestPublishedMonth)} is not available for {selectedService.toUpperCase()} yet. Showing latest available data: {formatMonthLabel(selectedServiceLatestMonth)}.
+            </span>
+          </div>
+        )}
 
         <div className="flex items-center space-x-2 text-[12px] font-mono text-canvas/60">
           <CalendarDays size={14} className="text-block-lime" />

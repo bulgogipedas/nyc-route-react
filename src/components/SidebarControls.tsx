@@ -6,6 +6,7 @@ import {
   Tooltip,
   ReferenceLine,
 } from 'recharts'
+import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { Layers, Cuboid as Cube, HelpCircle, Activity, MapPinned, CalendarDays, AlertCircle } from 'lucide-react'
 
@@ -35,6 +36,7 @@ interface ChartClickState {
 }
 
 export default function SidebarControls() {
+  const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null)
   const {
     timeHour,
     selectedService,
@@ -76,18 +78,6 @@ export default function SidebarControls() {
   const strongestFlow = odFlows[0]?.count || 0
   const services = metadata?.available_services?.length ? metadata.available_services : ['yellow']
   const visibleMonths = availableMonths.filter((month) => !month.service_type || month.service_type === selectedService)
-  const allServiceMonths = metadata?.available_months_by_service
-    ? Object.values(metadata.available_months_by_service).flat()
-    : availableMonths.map((month) => month.id)
-  const latestPublishedMonth = [...new Set(allServiceMonths)].sort().at(-1)
-  const selectedServiceMonths = metadata?.available_months_by_service?.[selectedService]
-    || visibleMonths.map((month) => month.id)
-  const selectedServiceLatestMonth = [...selectedServiceMonths].sort().at(-1)
-  const selectedServiceMissingLatest = Boolean(
-    latestPublishedMonth
-    && selectedServiceLatestMonth
-    && selectedServiceLatestMonth !== latestPublishedMonth
-  )
   const formatMonthLabel = (monthId: string) => {
     const month = availableMonths.find((item) => item.id === monthId)
     if (month) return month.label
@@ -102,11 +92,12 @@ export default function SidebarControls() {
   const handleServiceSelect = (service: string) => {
     const nextMonthIds = metadata?.available_months_by_service?.[service]
       || availableMonths.filter((month) => !month.service_type || month.service_type === service).map((month) => month.id)
-    const nextLatestMonth = [...nextMonthIds].sort().at(-1)
-    setSelectedService(service)
-    if (nextLatestMonth && !nextMonthIds.includes(selectedMonth)) {
-      setSelectedMonth(nextLatestMonth)
+    if (!nextMonthIds.includes(selectedMonth)) {
+      setAvailabilityWarning(`${service.toUpperCase()} data is not available for ${formatMonthLabel(selectedMonth)}. Keeping ${selectedService.toUpperCase()} ${formatMonthLabel(selectedMonth)}.`)
+      return
     }
+    setAvailabilityWarning(null)
+    setSelectedService(service)
   }
 
   return (
@@ -159,12 +150,10 @@ export default function SidebarControls() {
             </button>
           ))}
         </div>
-        {selectedServiceMissingLatest && latestPublishedMonth && selectedServiceLatestMonth && (
+        {availabilityWarning && (
           <div className="flex gap-2 rounded-md border border-block-pink/30 bg-block-pink/10 px-3 py-2 text-[11px] leading-relaxed text-canvas/75">
             <AlertCircle size={14} className="mt-0.5 shrink-0 text-block-pink" />
-            <span>
-              {formatMonthLabel(latestPublishedMonth)} is not available for {selectedService.toUpperCase()} yet. Showing latest available data: {formatMonthLabel(selectedServiceLatestMonth)}.
-            </span>
+            <span>{availabilityWarning}</span>
           </div>
         )}
 
@@ -176,7 +165,10 @@ export default function SidebarControls() {
           {visibleMonths.map((month) => (
             <button
               key={month.id}
-              onClick={() => setSelectedMonth(month.id)}
+              onClick={() => {
+                setAvailabilityWarning(null)
+                setSelectedMonth(month.id)
+              }}
               className={`min-h-11 rounded-md border px-2 py-2 text-left transition-all ${
                 selectedMonth === month.id
                   ? 'bg-block-lime text-primary border-block-lime'

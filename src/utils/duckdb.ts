@@ -1,4 +1,5 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
+import { dataUrl } from './dataVersion'
 
 let db: duckdb.AsyncDuckDB | null = null
 let conn: duckdb.AsyncDuckDBConnection | null = null
@@ -26,7 +27,7 @@ export async function initDuckDB() {
     console.log('DuckDB initialized. Registering TLC trip paths Parquet file...')
     await db.registerFileURL(
       'trip_paths.parquet',
-      `${window.location.origin}/data/trip_paths.parquet`,
+      `${window.location.origin}${dataUrl('/data/trip_paths.parquet')}`,
       duckdb.DuckDBDataProtocol.HTTP,
       false
     )

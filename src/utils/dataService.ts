@@ -1,6 +1,7 @@
 import { getDuckDB } from './duckdb'
 import { useStore, type H3Datum, type HourlyVolumeDatum, type MonthDatum, type ODFlowDatum, type PipelineMetadata, type StatsDatum, type TripDatum, type TripSegment } from '../store/useStore'
 import { latLngToCell, cellToLatLng } from 'h3-js'
+import { dataUrl } from './dataVersion'
 
 interface TripRow {
   vendor: number | string
@@ -17,29 +18,29 @@ export async function loadStaticData() {
   store.setLoading(true)
   try {
     const [statsRes, h3Res, odRes, monthsRes, hourlyByMonthRes, metadataRes, monthsByServiceRes, hourlyByServiceMonthRes] = await Promise.all([
-      fetch('/data/stats.json').then((res) => {
+      fetch(dataUrl('/data/stats.json')).then((res) => {
         if (!res.ok) throw new Error('Failed to fetch stats')
         return res.json()
       }),
-      fetch('/data/h3_deadhead.json').then((res) => {
+      fetch(dataUrl('/data/h3_deadhead.json')).then((res) => {
         if (!res.ok) throw new Error('Failed to fetch H3 deadhead')
         return res.json()
       }),
-      fetch('/data/od_flows.json').then((res) => {
+      fetch(dataUrl('/data/od_flows.json')).then((res) => {
         if (!res.ok) throw new Error('Failed to fetch OD flows')
         return res.json()
       }),
-      fetch('/data/months.json').then((res) => {
+      fetch(dataUrl('/data/months.json')).then((res) => {
         if (!res.ok) throw new Error('Failed to fetch months')
         return res.json()
       }),
-      fetch('/data/hourly_volume_by_month.json').then((res) => {
+      fetch(dataUrl('/data/hourly_volume_by_month.json')).then((res) => {
         if (!res.ok) throw new Error('Failed to fetch hourly volume by month')
         return res.json()
       }),
-      fetch('/data/metadata.json').then((res) => res.ok ? res.json() : null).catch(() => null),
-      fetch('/data/months_by_service.json').then((res) => res.ok ? res.json() : null).catch(() => null),
-      fetch('/data/hourly_volume_by_service_month.json').then((res) => res.ok ? res.json() : null).catch(() => null),
+      fetch(dataUrl('/data/metadata.json')).then((res) => res.ok ? res.json() : null).catch(() => null),
+      fetch(dataUrl('/data/months_by_service.json')).then((res) => res.ok ? res.json() : null).catch(() => null),
+      fetch(dataUrl('/data/hourly_volume_by_service_month.json')).then((res) => res.ok ? res.json() : null).catch(() => null),
     ])
 
     const metadata = metadataRes as PipelineMetadata | null
